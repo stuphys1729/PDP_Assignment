@@ -149,7 +149,15 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.c" />
+    <ClCompile Include="source\pool.c" />
+    <ClCompile Include="source\ran2.c" />
+    <ClCompile Include="source\squirrel-functions.c" />
+    <ClCompile Include="source\test.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="source\pool.h" />
+    <ClInclude Include="source\ran2.h" />
+    <ClInclude Include="source\squirrel-functions.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

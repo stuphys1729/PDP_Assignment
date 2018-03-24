@@ -30,6 +30,9 @@
     <ClCompile Include="source\test.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="source\squirrel-simulation.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="source\pool.h">

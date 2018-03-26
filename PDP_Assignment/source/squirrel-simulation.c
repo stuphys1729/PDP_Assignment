@@ -9,11 +9,11 @@
 
 #include "squirrel-functions.h"
 
-#define init_squirrels 34
+#define init_squirrels 2
 #define num_env_cells 16
 #define equil_steps 20
-#define max_months 24
-#define month_time 0.01 // How much real time to use as a simulated month (in seconds)
+#define max_months 2
+#define month_time 0.1 // How much real time to use as a simulated month (in seconds)
 
 #define FUNCTION_CALL 112
 #define GET_POSITION 113
@@ -23,15 +23,23 @@
 #define AVG_POP 124
 #define AVG_INF 125
 
+#define DEBUG 1
+
+static double start_time;
+static int rank;
+
 static void workerCode();
 static void squirrelCode(int);
 static void environmentCode(int);
+static void debug_msg(char*);
 
 MPI_Comm comw = MPI_COMM_WORLD;
 
 int main(int argc, char* argv[]) {
 	// Call MPI initialize first
 	MPI_Init(&argc, &argv);
+	start_time = MPI_Wtime();
+	MPI_Comm_rank(comw, &rank);
 
 	//Initialise the process pool.
 	int statusCode = processPoolInit();
@@ -54,7 +62,7 @@ int main(int argc, char* argv[]) {
 			int workerPid = startWorkerProcess();
 			env_cell_ids[i] = workerPid;
 			// Tell the processor it's an environmnt cell
-			MPI_Ssend(&i, 1, MPI_INT, workerPid, FUNCTION_CALL, comw, &environment_requests[0][i]);
+			MPI_Isend(&i, 1, MPI_INT, workerPid, FUNCTION_CALL, comw, &environment_requests[0][i]);
 			// Check when environment cells complete a month
 			MPI_Irecv(NULL, 0, MPI_INT, workerPid, 0, comw, &environment_requests[1][i]);// 1 for month 1
 			printf("Master started environment cell %d on MPI process %d\n", i, workerPid);
@@ -95,10 +103,10 @@ int main(int argc, char* argv[]) {
 
 			// If we have no live squirrels, or too many, then the simulation stops.
 			if (active_squirrels > 199) {
-				errorMessage("Too many Squirrels");
+				error_msg("Too many Squirrels");
 			}
 			else if (active_squirrels == 0) {
-				errorMessage("All the squirrels died :( ")
+				error_msg("All the squirrels died :( ");
 			}
 		}
 	}
@@ -107,6 +115,17 @@ int main(int argc, char* argv[]) {
 	// Finalize MPI, ensure you have closed the process pool first
 	MPI_Finalize();
 	return 0;
+}
+
+static void debug_msg(char* msg) {
+	double time = start_time - MPI_Wtime();
+	printf("[%d] : [Process %d] : %s", time, rank, msg);
+}
+
+static void error_msg(char * msg) {
+	double time = start_time - MPI_Wtime();
+	fprintf(stderr, "[%d] : [Process %d] : %s", time, rank, msg);
+	MPI_Abort(comw, 1);
 }
 
 static void workerCode() {
@@ -118,16 +137,9 @@ static void workerCode() {
 		
 		if (parent == 0) { // Master started us, so we could be a land cell
 			MPI_Recv(&function, 1, MPI_INT, 0, FUNCTION_CALL, comw, &function_stat);
-			if (function > -1) {
-				// This is a land cell
-				environmentCode(function);
-				break;
-			}
-			else 
-			{
-				// This is one of the initial squirrels
-				squirrelCode(0);
-			}
+
+			if (function > -1) environmentCode(function); // This is a land cell
+			else squirrelCode(0); // This is one of the initial squirrels
 		}
 		else {
 			// We were started by another squirrel giving birth to us
@@ -160,13 +172,19 @@ static void squirrelCode(int parent)
 		MPI_Recv(&x, 1, MPI_FLOAT, parent, GET_POSITION, comw, &pos_recv); // TODO: Make this one message for optimisation
 		MPI_Recv(&y, 1, MPI_FLOAT, parent, GET_POSITION, comw, &pos_recv);
 	}
+	if (DEBUG) {
+		char* debug_message;
+		sprintf(debug_message, "Squirrel started with pos: (%d,%d)", x, y);
+		debug_msg(debug_message);
+	}
 	// Get the ranks of the environment cells
 	MPI_Recv(&cells, num_env_cells, MPI_INT, parent, GET_CELLS, comw, &cell_recv);
 
 	// Simulate the squirrel
 	int alive = 1, infected = 0, cell, cell_proc, steps_since_inf, new_squirrel;
 	float avg_pop, avg_inf, x_buf, y_buf;
-	MPI_Request pop_recv, inf_recv, pos_send, cell_send;
+	MPI_Request pos_send, cell_send;
+	MPI_Status pop_recv, inf_recv;
 
 	while (alive) {
 		// Do squirrel stuff
@@ -178,6 +196,11 @@ static void squirrelCode(int parent)
 		cell = getCellFromPosition(x, y);
 		// And the corresponding governing process
 		cell_proc = cells[cell];
+		if (DEBUG) {
+			char* debug_message;
+			sprintf(debug_message, "Squirrel stepped in cell %d on proc %d", cell, cell_proc);
+			debug_msg(debug_message);
+		}
 		// Notify the cell that we have stepped in to it, and whether we are infected
 		MPI_Ssend(&infected, 1, MPI_INT, cell_proc, SQUIRREL_STEP, comw);
 
@@ -199,6 +222,11 @@ static void squirrelCode(int parent)
 			MPI_Isend(&x_buf, 1, MPI_FLOAT, new_squirrel, GET_POSITION, comw, &pos_send);
 			MPI_Isend(&y_buf, 1, MPI_FLOAT, new_squirrel, GET_POSITION, comw, &pos_send);
 			MPI_Isend(&cells, num_env_cells, MPI_INT, new_squirrel, GET_CELLS, comw, &cell_send);
+			if (DEBUG) {
+				char* debug_message;
+				sprintf(debug_message, "Squirrel gave birth to squirrel on %d", x);
+				debug_msg(debug_message);
+			}
 		}
 
 		if (shouldWorkerStop()) break; // If the simulation has been ended, this worker should stop

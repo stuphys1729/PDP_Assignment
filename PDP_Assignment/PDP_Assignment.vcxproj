@@ -149,6 +149,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="queue.c" />
     <ClCompile Include="source\pool.c" />
     <ClCompile Include="source\ran2.c" />
     <ClCompile Include="source\squirrel-functions.c" />

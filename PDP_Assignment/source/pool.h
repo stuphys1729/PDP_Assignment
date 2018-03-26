@@ -13,7 +13,13 @@ enum PP_Control_Command {
 // An example data package which combines the command with some optional data, an example and can be extended
 struct PP_Control_Package {
 	enum PP_Control_Command command;
-    int data;
+    struct PP_Data data;
+};
+
+struct PP_Data {
+	int function;
+	int parent;
+	int* cells;
 };
 
 // Initialises the process pool
@@ -31,6 +37,6 @@ int startWorkerProcess();
 // Called by a worker to shut the pool down
 void shutdownPool();
 // Retrieves the optional data associated with the command, provides an example of how this can be done
-int getCommandData();
+struct PP_Data getCommandData();
 
 #endif /* POOL_H_ */

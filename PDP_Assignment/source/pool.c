@@ -162,7 +162,7 @@ int workerSleep() {
  * Retrieves the data associated with the latest command, this is just an illustration of how you can associate optional
  * data with pool commands and we commonly associate the parent ID of a started worker
  */
-int getCommandData() {
+struct PP_Data getCommandData() {
 	return in_command.data;
 }
 
@@ -199,7 +199,7 @@ static int startAwaitingProcessesIfNeeded(int awaitingId, int parent) {
 			if(!PP_active[i]) {
 				PP_active[i]=1;
 				struct PP_Control_Package out_command = createCommandPackage(PP_WAKE);
-				out_command.data = awaitingId == PP_processesAwaitingStart ? parent : -1;
+				out_command.data.parent = awaitingId == PP_processesAwaitingStart ? parent : -1;
 				if (PP_DEBUG) printf("[Master] Starting process %d\n", i+1);
 				MPI_Send(&out_command, 1, PP_COMMAND_TYPE, i+1, PP_CONTROL_TAG, MPI_COMM_WORLD);
 				if (awaitingId == PP_processesAwaitingStart) awaitingProcessMPIRank = i+1;	// Will return this rank to the caller

@@ -32,6 +32,7 @@ static void workerCode();
 static void squirrelCode(int);
 static void environmentCode(int);
 static void debug_msg(char*);
+static void error_msg(char*);
 
 MPI_Comm comw = MPI_COMM_WORLD;
 
@@ -99,6 +100,7 @@ int main(int argc, char* argv[]) {
 				for (i = 0; i < num_env_cells; i++) {
 					MPI_Irecv(NULL, 0, MPI_INT, env_cell_ids[i], 0, comw, &environment_requests[current_month][i]);
 				}
+				month_end = 0;
 			}
 
 			// If we have no live squirrels, or too many, then the simulation stops.
@@ -180,13 +182,16 @@ static void squirrelCode(int parent)
 	// Get the ranks of the environment cells
 	MPI_Recv(&cells, num_env_cells, MPI_INT, parent, GET_CELLS, comw, &cell_recv);
 
+	return; // Stop for now (trying to get some meaningful debug output)
+
+
 	// Simulate the squirrel
-	int alive = 1, infected = 0, cell, cell_proc, steps_since_inf, new_squirrel;
+	int alive = 1, infected = 0, stepped = 0, cell, cell_proc, steps_since_inf, new_squirrel;
 	float avg_pop, avg_inf, x_buf, y_buf;
-	MPI_Request pos_send, cell_send;
-	MPI_Status pop_recv, inf_recv;
 
 	while (alive) {
+		MPI_Request pos_send, cell_send, step_send;
+		MPI_Status pop_recv, inf_recv;
 		// Do squirrel stuff
 		// Step to new position
 		squirrelStep(x, y, &x_new, &y_new, &state);
@@ -202,7 +207,13 @@ static void squirrelCode(int parent)
 			debug_msg(debug_message);
 		}
 		// Notify the cell that we have stepped in to it, and whether we are infected
-		MPI_Ssend(&infected, 1, MPI_INT, cell_proc, SQUIRREL_STEP, comw);
+		MPI_Isend(&infected, 1, MPI_INT, cell_proc, SQUIRREL_STEP, comw, &step_send);
+		while (!stepped) {
+			if (shouldWorkerStop()) break;
+			MPI_Test(&step_send, &stepped, MPI_STATUS_IGNORE);
+		}
+		if (!stepped) break; // We broke due to shouldWorkerStop() so we should stop
+		else stepped = 0;
 
 		// Receive the corresponding population and infection levels
 		MPI_Recv(&avg_pop, 1, MPI_FLOAT, cell_proc, AVG_POP, comw, &pop_recv);
@@ -234,25 +245,32 @@ static void squirrelCode(int parent)
 }
 
 static void environmentCode(int cell) {
-	int current_month = 1, squirrels_this = 0, inf_this = 0, incomming_inf;
+	int current_month = 1, squirrels_this = 0, inf_this = 0, stepped = 0, incomming_inf;
 	int squirrels_last1 = 0, squirrels_last2 = 0, inf_last = 0;
 	int pop_flux, inf_lev;
-	MPI_Status squirrel_step;
 	double start = MPI_Wtime();
 	
 	while (current_month <= max_months) {
-		// Do environment stuff
+		MPI_Request squirrel_step;
+		MPI_Status squirrel_step_status;
 
 		// Wait for a squirrel to step on us
-		MPI_Recv(&incomming_inf, 1, MPI_INT, MPI_ANY_SOURCE, SQUIRREL_STEP, comw, &squirrel_step);
+		MPI_Irecv(&incomming_inf, 1, MPI_INT, MPI_ANY_SOURCE, SQUIRREL_STEP, comw, &squirrel_step);
+		while (!stepped) {
+			if (shouldWorkerStop()) break;
+			MPI_Test(&squirrel_step, &stepped, &squirrel_step_status);
+		}
+		if (!stepped) break; // We broke due to shouldWorkerStop() so we should stop
+		else stepped = 0;
+
 		squirrels_this++;
 		if (incomming_inf) inf_this++;
 
 		pop_flux = squirrels_this + squirrels_last1 + squirrels_last2;
 		inf_lev = inf_last + inf_this;
 
-		MPI_Ssend(&pop_flux, 1, MPI_INT, squirrel_step.MPI_SOURCE, AVG_POP, comw); // TODO: Make this one, asynchronous message
-		MPI_Ssend(&inf_lev, 1, MPI_INT, squirrel_step.MPI_SOURCE, AVG_INF, comw);
+		MPI_Ssend(&pop_flux, 1, MPI_INT, squirrel_step_status.MPI_SOURCE, AVG_POP, comw); // TODO: Make this one, asynchronous message
+		MPI_Ssend(&inf_lev, 1, MPI_INT, squirrel_step_status.MPI_SOURCE, AVG_INF, comw);
 
 		// Do some test to see if the month should change
 		if (MPI_Wtime() - start > current_month * month_time) {

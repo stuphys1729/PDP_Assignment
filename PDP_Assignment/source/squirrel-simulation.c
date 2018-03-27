@@ -121,12 +121,12 @@ int main(int argc, char* argv[]) {
 
 static void debug_msg(char* msg) {
 	double time = MPI_Wtime() - start_time;
-	printf("[%f] : [Process %d] : %s\n", time, rank, msg);
+	printf("[%2.4f] | [Process %03d] | %s\n", time, rank, msg);
 }
 
 static void error_msg(char * msg) {
 	double time = MPI_Wtime() - start_time;
-	fprintf(stderr, "[%f] : [Process %d] : %s\n", time, rank, msg);
+	fprintf(stderr, "[%2.4f] | [Process %03d] | %s\n", time, rank, msg);
 	MPI_Abort(comw, 1);
 }
 
@@ -176,7 +176,7 @@ static void squirrelCode(int parent)
 	}
 	if (DEBUG) {
 		char debug_message[50];
-		sprintf(debug_message, "Squirrel started with pos: (%f,%f)", x, y);
+		sprintf(debug_message, "Squirrel started with pos: (%1.3f,%1.3f)", x, y);
 		debug_msg(debug_message);
 	}
 	// Get the ranks of the environment cells
@@ -200,7 +200,7 @@ static void squirrelCode(int parent)
 		cell_proc = cells[cell];
 		if (DEBUG) {
 			char debug_message[50];
-			sprintf(debug_message, "Squirrel stepped in cell %d on proc %d", cell, cell_proc);
+			sprintf(debug_message, "Squirrel stepped in cell %02d on proc %03d", cell, cell_proc);
 			debug_msg(debug_message);
 		}
 		// Notify the cell that we have stepped in to it, and whether we are infected
@@ -232,7 +232,7 @@ static void squirrelCode(int parent)
 			MPI_Isend(&cells, num_env_cells, MPI_INT, new_squirrel, GET_CELLS, comw, &cell_send);
 			if (DEBUG) {
 				char debug_message[50];
-				sprintf(debug_message, "Squirrel gave birth to squirrel on %d", x);
+				sprintf(debug_message, "Squirrel gave birth to squirrel on %03d", x);
 				debug_msg(debug_message);
 			}
 		}
@@ -262,7 +262,7 @@ static void environmentCode(int cell) {
 
 		if (DEBUG) {
 			char debug_message[50];
-			sprintf(debug_message, "Squirrel on process %d stepped on me", squirrel_step_status.MPI_SOURCE);
+			sprintf(debug_message, "Squirrel on process %03d stepped on me", squirrel_step_status.MPI_SOURCE);
 			debug_msg(debug_message);
 		}
 
@@ -275,10 +275,11 @@ static void environmentCode(int cell) {
 		MPI_Ssend(&pop_flux, 1, MPI_INT, squirrel_step_status.MPI_SOURCE, AVG_POP, comw); // TODO: Make this one, asynchronous message
 		MPI_Ssend(&inf_lev, 1, MPI_INT, squirrel_step_status.MPI_SOURCE, AVG_INF, comw);
 
-		// Do some test to see if the month should change
+		// Do a test to see if the month should change
 		if (MPI_Wtime() - start > current_month * month_time) {
-			printf("Environment Cell %d finished month %d | ", cell, current_month);
-			printf("Pop Influx: %d\tInf Level: %d\n", pop_flux, inf_lev);
+			double time = MPI_Wtime() - start_time;
+			printf("[%2.4f] | Environment Cell %02d finished month %02d | ", time, cell, current_month);
+			printf("Pop Influx: %03d\tInf Level: %03d\n", pop_flux, inf_lev);
 			squirrels_last2 = squirrels_last1;
 			squirrels_last1 = squirrels_this;
 			squirrels_this = 0;

@@ -13,12 +13,13 @@
 #define num_env_cells 16
 #define equil_steps 20
 #define max_months 2
-#define month_time 0.1 // How much real time to use as a simulated month (in seconds)
+#define month_time 1 // How much real time to use as a simulated month (in seconds)
+#define squirrel_buffer 50
 
+// MPI Tags
 #define FUNCTION_CALL 112
 #define GET_POSITION 113
 #define GET_CELLS 114
-
 #define SQUIRREL_STEP 123
 #define AVG_POP 124
 #define AVG_INF 125
@@ -183,8 +184,9 @@ static void squirrelCode(int parent)
 	MPI_Recv(&cells, num_env_cells, MPI_INT, parent, GET_CELLS, comw, &cell_recv);
 
 	// Simulate the squirrel
-	int alive = 1, infected = 0, stepped = 0, cell, cell_proc, steps_since_inf, new_squirrel;
-	float avg_pop, avg_inf, x_buf, y_buf;
+	int alive = 1, infected = 0, stepped = 0, cell, cell_proc, new_squirrel;
+	int step = -1,  inf_step, multiple;
+	float avg_pop, avg_inf, x_buf, y_buf, inf_lev[squirrel_buffer] = { 0 }, pop_inf[squirrel_buffer];
 
 	while (alive) {
 		MPI_Request pos_send, cell_send, step_send;
@@ -211,29 +213,39 @@ static void squirrelCode(int parent)
 		}
 		if (!stepped) break; // We broke due to shouldWorkerStop() so we should stop
 		else stepped = 0;
+		step++;
+		multiple = step % squirrel_buffer;
 
 		// Receive the corresponding population and infection levels
-		MPI_Recv(&avg_pop, 1, MPI_FLOAT, cell_proc, AVG_POP, comw, &pop_recv);
-		MPI_Recv(&avg_inf, 1, MPI_FLOAT, cell_proc, AVG_INF, comw, &inf_recv);
+		MPI_Recv(&pop_inf[multiple], 1, MPI_FLOAT, cell_proc, AVG_POP, comw, &pop_recv);
+		MPI_Recv(&inf_lev[multiple], 1, MPI_FLOAT, cell_proc, AVG_INF, comw, &inf_recv);
 
 		if (infected) {
-			steps_since_inf++;
-			if (steps_since_inf > 50) alive = willDie(&state);
+			if (step - inf_step > 50) alive = willDie(&state);
 		}
 		else {
+			avg_inf = 0;
+			for (i = 0; i < squirrel_buffer; i++) {
+				avg_inf += inf_lev[i];
+			}
 			infected = willCatchDisease(avg_inf, &state);
 		}
-
-		if (willGiveBirth(avg_pop, &state)) { // TODO: Check if previous child has received the buffered position first
-			new_squirrel = startWorkerProcess();
-			x_buf = x; y_buf = y;
-			MPI_Isend(&x_buf, 1, MPI_FLOAT, new_squirrel, GET_POSITION, comw, &pos_send);
-			MPI_Isend(&y_buf, 1, MPI_FLOAT, new_squirrel, GET_POSITION, comw, &pos_send);
-			MPI_Isend(&cells, num_env_cells, MPI_INT, new_squirrel, GET_CELLS, comw, &cell_send);
-			if (DEBUG) {
-				char debug_message[50];
-				sprintf(debug_message, "Squirrel gave birth to squirrel on %03d", x);
-				debug_msg(debug_message);
+		if (multiple == 0 && step != 0) {
+			avg_pop = 0;
+			for (i = 0; i < squirrel_buffer; i++) {
+				avg_pop += pop_inf[i];
+			}
+			if (willGiveBirth((float)avg_pop, &state)) { // TODO: Check if previous child has received the buffered position first
+				new_squirrel = startWorkerProcess();
+				x_buf = x; y_buf = y;
+				MPI_Isend(&x_buf, 1, MPI_FLOAT, new_squirrel, GET_POSITION, comw, &pos_send);
+				MPI_Isend(&y_buf, 1, MPI_FLOAT, new_squirrel, GET_POSITION, comw, &pos_send);
+				MPI_Isend(&cells, num_env_cells, MPI_INT, new_squirrel, GET_CELLS, comw, &cell_send);
+				if (DEBUG) {
+					char debug_message[50];
+					sprintf(debug_message, "Squirrel gave birth to squirrel on %03d", x);
+					debug_msg(debug_message);
+				}
 			}
 		}
 
@@ -242,14 +254,15 @@ static void squirrelCode(int parent)
 }
 
 static void environmentCode(int cell) {
-	int current_month = 1, squirrels_this = 0, inf_this = 0, stepped = 0, incomming_inf;
-	int squirrels_last1 = 0, squirrels_last2 = 0, inf_last = 0;
-	int pop_flux, inf_lev;
+	int current_month = 1, incomming_inf;
+	float squirrels_this = 0.0f, inf_this = 0.0f, stepped = 0.0f;
+	float squirrels_last1 = 0.0f, squirrels_last2 = 0.0f, inf_last = 0.0f;
+	float pop_flux, inf_lev;
 	double start = MPI_Wtime();
 	
 	while (current_month <= max_months) {
 		MPI_Request squirrel_step;
-		MPI_Status squirrel_step_status;
+		MPI_Status squirrel_step_status; 
 
 		// Wait for a squirrel to step on us
 		MPI_Irecv(&incomming_inf, 1, MPI_INT, MPI_ANY_SOURCE, SQUIRREL_STEP, comw, &squirrel_step);
@@ -272,13 +285,13 @@ static void environmentCode(int cell) {
 		pop_flux = squirrels_this + squirrels_last1 + squirrels_last2;
 		inf_lev = inf_last + inf_this;
 
-		MPI_Ssend(&pop_flux, 1, MPI_INT, squirrel_step_status.MPI_SOURCE, AVG_POP, comw); // TODO: Make this one, asynchronous message
-		MPI_Ssend(&inf_lev, 1, MPI_INT, squirrel_step_status.MPI_SOURCE, AVG_INF, comw);
+		MPI_Ssend(&pop_flux, 1, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, AVG_POP, comw); // TODO: Make this one, asynchronous message
+		MPI_Ssend(&inf_lev, 1, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, AVG_INF, comw);
 
 		// Do a test to see if the month should change
 		if (MPI_Wtime() - start > current_month * month_time) {
 			double time = MPI_Wtime() - start_time;
-			printf("[%2.4f] | Environment Cell %02d finished month %02d | ", time, cell, current_month);
+			printf("[%3.4f] | Environment Cell %02d finished month %02d | ", time, cell, current_month);
 			printf("Pop Influx: %03d\tInf Level: %03d\n", pop_flux, inf_lev);
 			squirrels_last2 = squirrels_last1;
 			squirrels_last1 = squirrels_this;

@@ -120,13 +120,13 @@ int main(int argc, char* argv[]) {
 }
 
 static void debug_msg(char* msg) {
-	double time = start_time - MPI_Wtime();
-	printf("[%d] : [Process %d] : %s", time, rank, msg);
+	double time = MPI_Wtime() - start_time;
+	printf("[%d] : [Process %d] : %s\n", time, rank, msg);
 }
 
 static void error_msg(char * msg) {
-	double time = start_time - MPI_Wtime();
-	fprintf(stderr, "[%d] : [Process %d] : %s", time, rank, msg);
+	double time = MPI_Wtime() - start_time;
+	fprintf(stderr, "[%d] : [Process %d] : %s\n", time, rank, msg);
 	MPI_Abort(comw, 1);
 }
 
@@ -156,10 +156,10 @@ static void squirrelCode(int parent)
 {
 	int my_rank, i, cells[num_env_cells];
 	float x=0, y=0, x_new, y_new;
-	long state = -1 - my_rank;
 	MPI_Status cell_recv, pos_recv;
 
 	MPI_Comm_rank(comw, &my_rank);
+	long state = -1 - my_rank;
 
 	initialiseRNG(&state); // Initialise random number generation
 
@@ -175,15 +175,12 @@ static void squirrelCode(int parent)
 		MPI_Recv(&y, 1, MPI_FLOAT, parent, GET_POSITION, comw, &pos_recv);
 	}
 	if (DEBUG) {
-		char* debug_message;
+		char debug_message[50];
 		sprintf(debug_message, "Squirrel started with pos: (%d,%d)", x, y);
 		debug_msg(debug_message);
 	}
 	// Get the ranks of the environment cells
 	MPI_Recv(&cells, num_env_cells, MPI_INT, parent, GET_CELLS, comw, &cell_recv);
-
-	return; // Stop for now (trying to get some meaningful debug output)
-
 
 	// Simulate the squirrel
 	int alive = 1, infected = 0, stepped = 0, cell, cell_proc, steps_since_inf, new_squirrel;
@@ -202,7 +199,7 @@ static void squirrelCode(int parent)
 		// And the corresponding governing process
 		cell_proc = cells[cell];
 		if (DEBUG) {
-			char* debug_message;
+			char debug_message[50];
 			sprintf(debug_message, "Squirrel stepped in cell %d on proc %d", cell, cell_proc);
 			debug_msg(debug_message);
 		}
@@ -234,7 +231,7 @@ static void squirrelCode(int parent)
 			MPI_Isend(&y_buf, 1, MPI_FLOAT, new_squirrel, GET_POSITION, comw, &pos_send);
 			MPI_Isend(&cells, num_env_cells, MPI_INT, new_squirrel, GET_CELLS, comw, &cell_send);
 			if (DEBUG) {
-				char* debug_message;
+				char debug_message[50];
 				sprintf(debug_message, "Squirrel gave birth to squirrel on %d", x);
 				debug_msg(debug_message);
 			}
@@ -262,6 +259,12 @@ static void environmentCode(int cell) {
 		}
 		if (!stepped) break; // We broke due to shouldWorkerStop() so we should stop
 		else stepped = 0;
+
+		if (DEBUG) {
+			char debug_message[50];
+			sprintf(debug_message, "Squirrel on process %d stepped on me", squirrel_step_status.MPI_SOURCE);
+			debug_msg(debug_message);
+		}
 
 		squirrels_this++;
 		if (incomming_inf) inf_this++;

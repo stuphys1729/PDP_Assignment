@@ -254,8 +254,8 @@ static void squirrelCode(int parent)
 }
 
 static void environmentCode(int cell) {
-	int current_month = 1, incomming_inf;
-	float squirrels_this = 0.0f, inf_this = 0.0f, stepped = 0.0f;
+	int current_month = 1, incomming_inf, stepped = 0;
+	float squirrels_this = 0.0f, inf_this = 0.0f;
 	float squirrels_last1 = 0.0f, squirrels_last2 = 0.0f, inf_last = 0.0f;
 	float pop_flux, inf_lev;
 	double start = MPI_Wtime();
@@ -292,7 +292,7 @@ static void environmentCode(int cell) {
 		if (MPI_Wtime() - start > current_month * month_time) {
 			double time = MPI_Wtime() - start_time;
 			printf("[%3.4f] | Environment Cell %02d finished month %02d | ", time, cell, current_month);
-			printf("Pop Influx: %03d\tInf Level: %03d\n", pop_flux, inf_lev);
+			printf("Pop Influx: %3.f\tInf Level: %3.f\n", pop_flux, inf_lev);
 			squirrels_last2 = squirrels_last1;
 			squirrels_last1 = squirrels_this;
 			squirrels_this = 0;

@@ -299,12 +299,7 @@ static void environmentCode(int cell) {
 			MPI_Test(&squirrel_step, &stepped, &squirrel_step_status);
 		}
 		if (!stepped) { // We broke without being stepped on
-			if (month_end) { // The month ended whilst we were waiting
-				continue;
-			}
-			else {
-
-			}
+			if (!month_end) break; // The simulation has stopped prematurely
 		}
 		else {
 			stepped = 0;
@@ -324,10 +319,9 @@ static void environmentCode(int cell) {
 			MPI_Ssend(&pop_flux, 1, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, AVG_POP, comw); // TODO: Make this one, asynchronous message
 			MPI_Ssend(&inf_lev, 1, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, AVG_INF, comw);
 		}
-		
 
 		// Do a test to see if the month should change
-		if (MPI_Wtime() - start > current_month * month_time) {
+		if (month_end || MPI_Wtime() - start > current_month * month_time) {
 			double time = MPI_Wtime() - start_time;
 			printf("[%3.4f] | Environment Cell %02d finished month %02d | ", time, cell, current_month);
 			printf("Pop Influx: %3.f\tInf Level: %3.f\n", pop_flux, inf_lev);

@@ -99,7 +99,7 @@ int main(int argc, char* argv[]) {
 
 			MPI_Testall(num_env_cells, environment_requests[current_month], &month_end, environment_statuses);
 			if (month_end) {
-				printf("All cells have completed month %d\n", current_month);
+				printf("[%2.4f] | All cells have completed month %d | ", MPI_Wtime() - start_time ,current_month);
 				printf("Living Squirrels: %03d\tInfected Squirrels: %03d\n", active_squirrels, infected_squirrels);
 				current_month++;
 				if (current_month > max_months) break; // Simulation has ended
@@ -119,6 +119,7 @@ int main(int argc, char* argv[]) {
 				error_msg("All the squirrels died :( ");
 			}
 		}
+		printf("Master is finishing...");
 	}
 	// Finalizes the process pool, call this before closing down MPI
 	processPoolFinalise();

@@ -9,10 +9,10 @@
 
 #include "squirrel-functions.h"
 
-#define init_squirrels 2
+#define init_squirrels 34
 #define num_env_cells 16
 #define equil_steps 20
-#define max_months 2
+#define max_months 12
 #define month_time 1 // How much real time to use as a simulated month (in seconds)
 #define squirrel_buffer 50
 
@@ -228,6 +228,8 @@ static void squirrelCode(int parent)
 			for (i = 0; i < squirrel_buffer; i++) {
 				avg_inf += inf_lev[i];
 			}
+			avg_inf /= squirrel_buffer;
+
 			infected = willCatchDisease(avg_inf, &state);
 		}
 		if (multiple == 0 && step != 0) {
@@ -235,6 +237,8 @@ static void squirrelCode(int parent)
 			for (i = 0; i < squirrel_buffer; i++) {
 				avg_pop += pop_inf[i];
 			}
+			avg_pop /= squirrel_buffer;
+
 			if (willGiveBirth((float)avg_pop, &state)) { // TODO: Check if previous child has received the buffered position first
 				new_squirrel = startWorkerProcess();
 				x_buf = x; y_buf = y;

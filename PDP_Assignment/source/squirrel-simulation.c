@@ -277,7 +277,7 @@ static void squirrelCode(int parent)
 }
 
 static void environmentCode(int cell) {
-	int current_month = 1, incomming_inf, stepped = 0;
+	int current_month = 1, incomming_inf, stepped = 0, month_end = 0;
 	float squirrels_this = 0.0f, inf_this = 0.0f;
 	float squirrels_last1 = 0.0f, squirrels_last2 = 0.0f, inf_last = 0.0f;
 	float pop_flux, inf_lev;
@@ -292,41 +292,56 @@ static void environmentCode(int cell) {
 		MPI_Irecv(&incomming_inf, 1, MPI_INT, MPI_ANY_SOURCE, SQUIRREL_STEP, comw, &squirrel_step);
 		while (!stepped) {
 			if (shouldWorkerStop()) break;
+			if (MPI_Wtime() - start > current_month * month_time) {
+				month_end = 1;
+				break;
+			}
 			MPI_Test(&squirrel_step, &stepped, &squirrel_step_status);
 		}
-		if (!stepped) break; // We broke due to shouldWorkerStop() so we should stop
-		else stepped = 0;
+		if (!stepped) { // We broke without being stepped on
+			if (month_end) { // The month ended whilst we were waiting
+				continue;
+			}
+			else {
 
-		if (VERB_DEBUG) {
-			char debug_message[50];
-			sprintf(debug_message, "Squirrel on process %03d stepped on me", squirrel_step_status.MPI_SOURCE);
-			debug_msg(debug_message);
+			}
 		}
+		else {
+			stepped = 0;
 
-		squirrels_this++;
-		if (incomming_inf) inf_this++;
+			if (VERB_DEBUG) {
+				char debug_message[50];
+				sprintf(debug_message, "Squirrel on process %03d stepped on me", squirrel_step_status.MPI_SOURCE);
+				debug_msg(debug_message);
+			}
 
-		pop_flux = squirrels_this + squirrels_last1 + squirrels_last2;
-		inf_lev = inf_last + inf_this;
+			squirrels_this++;
+			if (incomming_inf) inf_this++;
 
-		MPI_Ssend(&pop_flux, 1, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, AVG_POP, comw); // TODO: Make this one, asynchronous message
-		MPI_Ssend(&inf_lev, 1, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, AVG_INF, comw);
+			pop_flux = squirrels_this + squirrels_last1 + squirrels_last2;
+			inf_lev = inf_last + inf_this;
+
+			MPI_Ssend(&pop_flux, 1, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, AVG_POP, comw); // TODO: Make this one, asynchronous message
+			MPI_Ssend(&inf_lev, 1, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, AVG_INF, comw);
+		}
+		
 
 		// Do a test to see if the month should change
 		if (MPI_Wtime() - start > current_month * month_time) {
 			double time = MPI_Wtime() - start_time;
 			printf("[%3.4f] | Environment Cell %02d finished month %02d | ", time, cell, current_month);
 			printf("Pop Influx: %3.f\tInf Level: %3.f\n", pop_flux, inf_lev);
-			if (current_month == max_months - 1) break; // Last message should be non blocking
+			if (current_month == max_months) break; // Last message should be blocking
 			squirrels_last2 = squirrels_last1;
 			squirrels_last1 = squirrels_this;
 			squirrels_this = 0;
 			inf_last = inf_this;
 			inf_this = 0;
 			current_month++;
+			month_end = 0;
 			MPI_Isend(NULL, 0, MPI_INT, MASTER, MONTH_END, comw, &month_send);
 		}
 	}
-	MPI_Ssend(NULL, 0, MPI_INT, MASTER, MONTH_END, comw);
+	if (month_end) MPI_Ssend(NULL, 0, MPI_INT, MASTER, MONTH_END, comw);
 }
 	

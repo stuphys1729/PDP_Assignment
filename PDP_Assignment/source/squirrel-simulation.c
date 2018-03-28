@@ -244,7 +244,7 @@ static void squirrelCode(int parent)
 			infected = willCatchDisease(avg_inf, &state);
 			if (infected && DEBUG) {
 				char* debug_message = "Squirrel became infected";
-				debug_msg(&debug_message);
+				debug_msg(debug_message);
 			}
 		}
 		if (multiple == 0 && step != 0) {
@@ -262,7 +262,7 @@ static void squirrelCode(int parent)
 				MPI_Isend(&cells, num_env_cells, MPI_INT, new_squirrel, GET_CELLS, comw, &cell_send);
 				if (DEBUG) {
 					char debug_message[50];
-					sprintf(debug_message, "Squirrel gave birth to squirrel on %03d", x);
+					sprintf(debug_message, "Squirrel gave birth to squirrel on %03d", new_squirrel);
 					debug_msg(debug_message);
 				}
 			}
@@ -326,7 +326,7 @@ static void environmentCode(int cell) {
 			current_month++;
 			MPI_Isend(NULL, 0, MPI_INT, MASTER, MONTH_END, comw, &month_send);
 		}
-		MPI_Ssend(NULL, 0, MPI_INT, MASTER, MONTH_END, comw, &month_send);
 	}
+	MPI_Ssend(NULL, 0, MPI_INT, MASTER, MONTH_END, comw);
 }
 	

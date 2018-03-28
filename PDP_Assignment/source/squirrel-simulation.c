@@ -29,6 +29,7 @@
 #define MASTER 0
 
 #define DEBUG 1
+#define VERB_DEBUG 0
 
 static double start_time;
 static int rank;
@@ -126,7 +127,7 @@ int main(int argc, char* argv[]) {
 	return 0;
 }
 
-static void debug_msg(char* msg) {
+static void debug_msg(char* msg) { // TODO: make these functions take arguments like printf
 	double time = MPI_Wtime() - start_time;
 	printf("[%2.4f] | [Process %03d] | %s\n", time, rank, msg);
 }
@@ -210,7 +211,7 @@ static void squirrelCode(int parent)
 		cell = getCellFromPosition(x, y);
 		// And the corresponding governing process
 		cell_proc = cells[cell];
-		if (DEBUG) {
+		if (VERB_DEBUG) {
 			char debug_message[50];
 			sprintf(debug_message, "Squirrel stepped in cell %02d on proc %03d", cell, cell_proc);
 			debug_msg(debug_message);
@@ -241,6 +242,10 @@ static void squirrelCode(int parent)
 			avg_inf /= squirrel_buffer;
 
 			infected = willCatchDisease(avg_inf, &state);
+			if (infected && DEBUG) {
+				const char debug_message = "Squirrel became infected";
+				debug_msg(debug_message);
+			}
 		}
 		if (multiple == 0 && step != 0) {
 			avg_pop = 0;
@@ -265,6 +270,10 @@ static void squirrelCode(int parent)
 
 		if (shouldWorkerStop()) break; // If the simulation has been ended, this worker should stop
 	}
+	if (!alive && DEBUG) { // Might not have stopped due to death
+		const char debug_message = "Squirrel died :( ";
+		debug_msg(debug_message);
+	}
 }
 
 static void environmentCode(int cell) {
@@ -273,7 +282,7 @@ static void environmentCode(int cell) {
 	float squirrels_last1 = 0.0f, squirrels_last2 = 0.0f, inf_last = 0.0f;
 	float pop_flux, inf_lev;
 	double start = MPI_Wtime();
-	MPI_Status month_status;
+	MPI_Request month_send;
 	
 	while (current_month <= max_months) {
 		MPI_Request squirrel_step;
@@ -288,7 +297,7 @@ static void environmentCode(int cell) {
 		if (!stepped) break; // We broke due to shouldWorkerStop() so we should stop
 		else stepped = 0;
 
-		if (DEBUG) {
+		if (VERB_DEBUG) {
 			char debug_message[50];
 			sprintf(debug_message, "Squirrel on process %03d stepped on me", squirrel_step_status.MPI_SOURCE);
 			debug_msg(debug_message);
@@ -314,7 +323,7 @@ static void environmentCode(int cell) {
 			inf_last = inf_this;
 			inf_this = 0;
 			current_month++;
-			MPI_Isend(NULL, 0, MPI_INT, MASTER, MONTH_END, comw, &month_status);
+			MPI_Isend(NULL, 0, MPI_INT, MASTER, MONTH_END, comw, &month_send);
 		}
 
 		if (shouldWorkerStop()) break; // If the simulation has been ended, this worker should stop

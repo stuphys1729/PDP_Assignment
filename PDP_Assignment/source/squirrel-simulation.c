@@ -317,6 +317,7 @@ static void environmentCode(int cell) {
 			double time = MPI_Wtime() - start_time;
 			printf("[%3.4f] | Environment Cell %02d finished month %02d | ", time, cell, current_month);
 			printf("Pop Influx: %3.f\tInf Level: %3.f\n", pop_flux, inf_lev);
+			if (current_month == max_months - 1) break; // Last message should be non blocking
 			squirrels_last2 = squirrels_last1;
 			squirrels_last1 = squirrels_this;
 			squirrels_this = 0;
@@ -325,8 +326,7 @@ static void environmentCode(int cell) {
 			current_month++;
 			MPI_Isend(NULL, 0, MPI_INT, MASTER, MONTH_END, comw, &month_send);
 		}
-
-		if (shouldWorkerStop()) break; // If the simulation has been ended, this worker should stop
+		MPI_Ssend(NULL, 0, MPI_INT, MASTER, MONTH_END, comw, &month_send);
 	}
 }
 	

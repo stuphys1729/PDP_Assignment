@@ -243,8 +243,8 @@ static void squirrelCode(int parent)
 
 			infected = willCatchDisease(avg_inf, &state);
 			if (infected && DEBUG) {
-				const char debug_message = "Squirrel became infected";
-				debug_msg(debug_message);
+				char* debug_message = "Squirrel became infected";
+				debug_msg(&debug_message);
 			}
 		}
 		if (multiple == 0 && step != 0) {
@@ -271,7 +271,7 @@ static void squirrelCode(int parent)
 		if (shouldWorkerStop()) break; // If the simulation has been ended, this worker should stop
 	}
 	if (!alive && DEBUG) { // Might not have stopped due to death
-		const char debug_message = "Squirrel died :( ";
+		char* debug_message = "Squirrel died :( ";
 		debug_msg(debug_message);
 	}
 }

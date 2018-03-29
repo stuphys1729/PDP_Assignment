@@ -50,10 +50,6 @@ int processPoolInit() {
 		if (PP_DEBUG) printf("[Master] Initialised Master\n");
 		return 2;
 	} 
-	else if (PP_myRank == 1) {
-		// This will be the coordinator
-		return 3;
-	}
 	else {
 		MPI_Recv(&in_command, 1, PP_COMMAND_TYPE, 0, PP_CONTROL_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		return handleRecievedCommand();

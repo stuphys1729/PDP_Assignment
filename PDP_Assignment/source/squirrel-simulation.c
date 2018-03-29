@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
 			masterStatus = masterPoll(); // Pass something to tell if a process was killed or started?
 
 		}
-		printf("Master is finishing...");
+		printf("Master is finishing...\n");
 	}
 	// Finalizes the process pool, call this before closing down MPI
 	processPoolFinalise();
@@ -164,9 +164,11 @@ static void coordinatorCode() {
 			printf("[%2.4f] | All cells have completed month %d | ", MPI_Wtime() - start_time, current_month);
 			printf("Living Squirrels: %03d\tInfected Squirrels: %03d\n", active_squirrels, infected_squirrels);
 			current_month++;
-			if (current_month > max_months) break; // Simulation has ended
-
-												   // Preapre messages for next month
+			if (current_month > max_months) {
+				shutdownPool();
+				break; // Simulation has ended
+			}
+			// Preapre messages for next month
 			for (i = 0; i < num_env_cells; i++) {
 				MPI_Irecv(NULL, 0, MPI_INT, env_cell_ids[i], MONTH_END, comw, &environment_requests[current_month][i]);
 			}
@@ -293,7 +295,10 @@ static void squirrelCode(int parent)
 			}
 		}
 
-		if (shouldWorkerStop()) break; // If the simulation has been ended, this worker should stop
+		if (shouldWorkerStop()) {
+			printf("Squirrel is stopping\n")
+			break; // If the simulation has been ended, this worker should stop
+		}
 	}
 	if (!alive && DEBUG) { // Might not have stopped due to death
 		char* debug_message = "Squirrel died :( ";

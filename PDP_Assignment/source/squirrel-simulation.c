@@ -101,11 +101,12 @@ static void workerCode() {
 	while (workerStatus) {
 		int parent = getCommandData(); // The wake-up data tells us who started us
 		
-			MPI_Recv(&function, 1, MPI_INT, COORDINATOR, FUNCTION_CALL, comw, &function_stat);
 		if (parent == MASTER) { // Master started us, so we are the coordinator
+			if (DEBUG) printf("Starting Coordinator\n");
 			coordinatorCode();
 		}
 		else if (parent == COORDINATOR) {// Coordinator started us, so we could be a land cell
+			MPI_Recv(&function, 1, MPI_INT, COORDINATOR, FUNCTION_CALL, comw, &function_stat);
 			if (function > -1) environmentCode(function); // This is a land cell
 			else squirrelCode(COORDINATOR); // This is one of the initial squirrels
 		}
@@ -155,10 +156,8 @@ static void coordinatorCode() {
 	int current_month = 1, month_end = 0;
 	MPI_Status environment_statuses[num_env_cells];
 
-	int workerStatus = shouldWorkerStop();
+	int workerStatus = 1;
 	while (workerStatus) {
-		workerStatus = shouldWorkerStop();
-
 		// Check if all cells have finished the current month
 		MPI_Testall(num_env_cells, environment_requests[current_month], &month_end, environment_statuses);
 		if (month_end) {
@@ -181,8 +180,9 @@ static void coordinatorCode() {
 		else if (active_squirrels == 0) {
 			error_msg("All the squirrels died :( ");
 		}
+		workerStatus = shouldWorkerStop();
 	}
-	printf("Coordinator is finishing...");
+	printf("Coordinator is finishing...\n");
 }
 
 static void squirrelCode(int parent)

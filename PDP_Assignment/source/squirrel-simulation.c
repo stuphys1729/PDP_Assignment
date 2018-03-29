@@ -227,7 +227,7 @@ static void squirrelCode(int parent)
 	float avg_pop, avg_inf, x_buf, y_buf, inf_lev[squirrel_buffer] = { 0 }, pop_inf[squirrel_buffer];
 
 	while (alive) {
-		MPI_Request pos_send, cell_send, step_send;
+		MPI_Request pos_send, cell_send, step_send, step_recv;
 		MPI_Status pop_recv, inf_recv;
 		// Do squirrel stuff
 		// Step to new position
@@ -245,17 +245,18 @@ static void squirrelCode(int parent)
 		}
 		// Notify the cell that we have stepped in to it, and whether we are infected
 		MPI_Isend(&infected, 1, MPI_INT, cell_proc, SQUIRREL_STEP, comw, &step_send);
-		while (!stepped) {
-			if (shouldWorkerStop()) break;
-			MPI_Test(&step_send, &stepped, MPI_STATUS_IGNORE);
-		}
-		if (!stepped) break; // We broke due to shouldWorkerStop() so we should stop
-		else stepped = 0;
 		step++;
 		multiple = step % squirrel_buffer;
 
 		// Receive the corresponding population and infection levels
-		MPI_Recv(&pop_inf[multiple], 1, MPI_FLOAT, cell_proc, AVG_POP, comw, &pop_recv);
+		MPI_Irecv(&pop_inf[multiple], 1, MPI_FLOAT, cell_proc, AVG_POP, comw, &step_recv);
+		while (!stepped) {
+			if (shouldWorkerStop()) break;
+			MPI_Test(&step_recv, &stepped, &pop_recv);
+		}
+		if (!stepped) break; // We broke due to shouldWorkerStop() so we should stop
+		else stepped = 0;
+		
 		MPI_Recv(&inf_lev[multiple], 1, MPI_FLOAT, cell_proc, AVG_INF, comw, &inf_recv);
 
 		if (infected) {
@@ -296,7 +297,7 @@ static void squirrelCode(int parent)
 		}
 
 		if (shouldWorkerStop()) {
-			printf("Squirrel is stopping\n")
+			printf("Squirrel is stopping\n");
 			break; // If the simulation has been ended, this worker should stop
 		}
 	}

@@ -251,7 +251,10 @@ static void squirrelCode(int parent)
 		// Receive the corresponding population and infection levels
 		MPI_Irecv(&pop_inf[multiple], 1, MPI_FLOAT, cell_proc, AVG_POP, comw, &step_recv);
 		while (!stepped) {
-			if (shouldWorkerStop()) break;
+			if (shouldWorkerStop()) {
+				printf("Squirrel is stopping\n");
+				break; // If the simulation has been ended, this worker should stop
+			}
 			MPI_Test(&step_recv, &stepped, &pop_recv);
 		}
 		if (!stepped) break; // We broke due to shouldWorkerStop() so we should stop

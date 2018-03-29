@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
 		int workerPid = startWorkerProcess();
 		if (workerPid != COORDINATOR) {
 			char bad_setup[50];
-			sprintf("Corrdinator was started on process %d", rank);
+			sprintf(bad_setup, "Corrdinator was started on process %d", rank);
 			error_msg(bad_setup);
 		}
 
@@ -101,6 +101,7 @@ static void workerCode() {
 	while (workerStatus) {
 		int parent = getCommandData(); // The wake-up data tells us who started us
 		
+			MPI_Recv(&function, 1, MPI_INT, COORDINATOR, FUNCTION_CALL, comw, &function_stat);
 		if (parent == MASTER) { // Master started us, so we are the coordinator
 			coordinatorCode();
 		}

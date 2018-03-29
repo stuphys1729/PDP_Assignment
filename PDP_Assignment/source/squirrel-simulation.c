@@ -27,6 +27,7 @@
 #define AVG_INF 125
 
 #define MASTER 0
+#define COORDINATOR 1
 
 #define DEBUG 1
 #define VERB_DEBUG 0
@@ -60,7 +61,20 @@ int main(int argc, char* argv[]) {
 		* This is the master, each call to master poll will block until a message is received and then will handle it and return
 		* 1 to continue polling and running the pool or 0 to quit.
 		*/
-		int i, infected, active_squirrels = 0, infected_squirrels = 0, returnCode, env_cell_ids[num_env_cells];
+		int masterStatus = masterPoll();
+		while (masterStatus) {
+			masterStatus = masterPoll(); // Pass something to tell if a process was killed or started?
+
+		}
+		printf("Master is finishing...");
+
+	}
+	else if (statusCode == 3) {
+		/*
+		* This is going to be the coordinator, keeping track of the month changing and squirrel life-cycles
+		*/
+
+		int i, infected, active_squirrels = 0, infected_squirrels = 0, env_cell_ids[num_env_cells];
 		int f_squirrel = -1; // Defines a squirrel class, 0 or a positive integer indicates a certain land cell
 
 		// Initialise the environment cells
@@ -72,7 +86,7 @@ int main(int argc, char* argv[]) {
 			MPI_Isend(&i, 1, MPI_INT, workerPid, FUNCTION_CALL, comw, &environment_requests[0][i]);
 			// Check when environment cells complete a month
 			MPI_Irecv(NULL, 0, MPI_INT, workerPid, MONTH_END, comw, &environment_requests[1][i]);// 1 for month 1
-			printf("Master started environment cell %d on MPI process %d\n", i, workerPid);
+			printf("Coordinator started environment cell %d on MPI process %d\n", i, workerPid);
 		}
 
 		// Initialise the squirrels
@@ -86,17 +100,18 @@ int main(int argc, char* argv[]) {
 			// And where the environment cells are
 			MPI_Isend(&env_cell_ids, num_env_cells, MPI_INT, workerPid, GET_CELLS, comw, &initial_squirrel_requests[0][i]);
 			active_squirrels++;
-			printf("Master started squirrel %d on MPI process %d\n", i, workerPid);
+			printf("Coordinator started squirrel %d on MPI process %d\n", i, workerPid);
 		}
 
 		// Run the simulation
 		int current_month = 1, month_end = 0;
 		MPI_Status environment_statuses[num_env_cells];
-		int masterStatus = masterPoll();
-		while (masterStatus) {
-			masterStatus = masterPoll(); // pass &active_squirrels?
-			// Do some stuff
+		
+		int workerStatus = shouldWorkerStop();
+		while (workerStatus) {
+			workerStatus = shouldWorkerStop();
 
+			// Check if all cells have finished the current month
 			MPI_Testall(num_env_cells, environment_requests[current_month], &month_end, environment_statuses);
 			if (month_end) {
 				printf("[%2.4f] | All cells have completed month %d | ", MPI_Wtime() - start_time ,current_month);
@@ -119,7 +134,7 @@ int main(int argc, char* argv[]) {
 				error_msg("All the squirrels died :( ");
 			}
 		}
-		printf("Master is finishing...");
+		printf("Coordinator is finishing...");
 	}
 	// Finalizes the process pool, call this before closing down MPI
 	processPoolFinalise();
@@ -146,11 +161,11 @@ static void workerCode() {
 	while (workerStatus) {
 		int parent = getCommandData(); // The wake-up data tells us who started us
 		
-		if (parent == MASTER) { // Master started us, so we could be a land cell
-			MPI_Recv(&function, 1, MPI_INT, MASTER, FUNCTION_CALL, comw, &function_stat);
+		if (parent == COORDINATOR) { // Coordinator started us, so we could be a land cell
+			MPI_Recv(&function, 1, MPI_INT, COORDINATOR, FUNCTION_CALL, comw, &function_stat);
 
 			if (function > -1) environmentCode(function); // This is a land cell
-			else squirrelCode(MASTER); // This is one of the initial squirrels
+			else squirrelCode(COORDINATOR); // This is one of the initial squirrels
 		}
 		else {
 			// We were started by another squirrel giving birth to us
@@ -173,9 +188,9 @@ static void squirrelCode(int parent)
 	initialiseRNG(&state); // Initialise random number generation
 
 	int infected;
-	if (parent == MASTER) {
+	if (parent == COORDINATOR) {
 		// Could be infected
-		MPI_Recv(&infected, 1, MPI_INT, MASTER, FUNCTION_CALL, comw, MPI_STATUS_IGNORE);
+		MPI_Recv(&infected, 1, MPI_INT, COORDINATOR, FUNCTION_CALL, comw, MPI_STATUS_IGNORE);
 		// Let the squirrel get to a position independent of the start
 		for (i = 0; i < equil_steps; i++) {
 			squirrelStep(x, y, &x_new, &y_new, &state);
@@ -334,9 +349,9 @@ static void environmentCode(int cell) {
 			inf_this = 0;
 			current_month++;
 			month_end = 0;
-			MPI_Isend(NULL, 0, MPI_INT, MASTER, MONTH_END, comw, &month_send);
+			MPI_Isend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw, &month_send);
 		}
 	}
-	if (month_end) MPI_Ssend(NULL, 0, MPI_INT, MASTER, MONTH_END, comw);
+	if (month_end) MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw);
 }
 	

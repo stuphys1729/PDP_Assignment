@@ -73,6 +73,11 @@ int main(int argc, char* argv[]) {
 		/*
 		* This is going to be the coordinator, keeping track of the month changing and squirrel life-cycles
 		*/
+		if (rank != COORDINATOR) {
+			char bad_setup[50];
+			sprintf("Corrdinator was started on process %d", rank);
+			error_msg(bad_setup);
+		}
 
 		int i, infected, active_squirrels = 0, infected_squirrels = 0, env_cell_ids[num_env_cells];
 		int f_squirrel = -1; // Defines a squirrel class, 0 or a positive integer indicates a certain land cell

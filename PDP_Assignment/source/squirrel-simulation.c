@@ -78,6 +78,7 @@ int main(int argc, char* argv[]) {
 	}
 	// Finalizes the process pool, call this before closing down MPI
 	processPoolFinalise();
+	printf("PROCESS %03d CALLED POOLFINALISE\n");
 	// Finalize MPI, ensure you have closed the process pool first
 	MPI_Finalize();
 	printf("PROCESS %03d MADE IT TO THE END\n", rank);
@@ -255,6 +256,8 @@ static void squirrelCode(int parent)
 		while (!stepped) {
 			if (shouldWorkerStop()) {
 				printf("Squirrel is stopping\n");
+				MPI_Cancel(&step_send);
+				MPI_Cancel(&step_recv);
 				break; // If the simulation has been ended, this worker should stop
 			}
 			MPI_Test(&step_recv, &stepped, &pop_recv);

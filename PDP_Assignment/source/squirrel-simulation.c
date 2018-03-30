@@ -79,6 +79,7 @@ int main(int argc, char* argv[]) {
 	// Finalizes the process pool, call this before closing down MPI
 	processPoolFinalise();
 	// Finalize MPI, ensure you have closed the process pool first
+	printf("PROCESS %03d MADE IT TO THE END\n", rank);
 	MPI_Finalize();
 	return 0;
 }
@@ -278,7 +279,7 @@ static void squirrelCode(int parent)
 				debug_msg(debug_message);
 			}
 		}
-		if (multiple == 0 && step != 0) {
+		if (multiple == 0 && step != 0 && 0) { // STOPPING BIRTH
 			avg_pop = 0;
 			for (i = 0; i < squirrel_buffer; i++) {
 				avg_pop += pop_inf[i];
@@ -369,6 +370,11 @@ static void environmentCode(int cell) {
 			month_end = 0;
 			MPI_Isend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw, &month_send);
 		}
+	}
+	if (DEBUG) {
+		char* msg[50];
+		sprintf(msg, "Environment cell %02d has finished\n", cell);
+		debug_msg(msg);
 	}
 	if (month_end) MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw);
 }

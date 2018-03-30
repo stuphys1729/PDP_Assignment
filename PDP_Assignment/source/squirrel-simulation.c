@@ -9,12 +9,12 @@
 
 #include "squirrel-functions.h"
 
-#define init_squirrels 34
-#define init_infected 4
+#define init_squirrels 2
+#define init_infected 0
 #define num_env_cells 16
 #define equil_steps 20
 #define max_months 12
-#define month_time 0.1 // How much real time to use as a simulated month (in seconds)
+#define month_time 0.01 // How much real time to use as a simulated month (in seconds)
 #define squirrel_buffer 50
 
 // MPI Tags
@@ -79,8 +79,8 @@ int main(int argc, char* argv[]) {
 	// Finalizes the process pool, call this before closing down MPI
 	processPoolFinalise();
 	// Finalize MPI, ensure you have closed the process pool first
-	printf("PROCESS %03d MADE IT TO THE END\n", rank);
 	MPI_Finalize();
+	printf("PROCESS %03d MADE IT TO THE END\n", rank);
 	return 0;
 }
 

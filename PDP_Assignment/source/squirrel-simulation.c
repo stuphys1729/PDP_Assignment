@@ -14,7 +14,7 @@
 #define num_env_cells 16
 #define equil_steps 20
 #define max_months 12
-#define month_time 1 // How much real time to use as a simulated month (in seconds)
+#define month_time 0.1 // How much real time to use as a simulated month (in seconds)
 #define squirrel_buffer 50
 
 // MPI Tags
@@ -199,10 +199,11 @@ static void squirrelCode(int parent)
 
 	initialiseRNG(&state); // Initialise random number generation
 
-	int infected;
+	int infected, inf_step;
 	if (parent == COORDINATOR) {// We are an initial squirrel
 		// Could be infected
 		MPI_Recv(&infected, 1, MPI_INT, COORDINATOR, FUNCTION_CALL, comw, MPI_STATUS_IGNORE);
+		if (infected) inf_step = 0;
 		// Let the squirrel get to a position independent of the start
 		for (i = 0; i < equil_steps; i++) {
 			squirrelStep(x, y, &x_new, &y_new, &state);
@@ -224,7 +225,7 @@ static void squirrelCode(int parent)
 
 	// Simulate the squirrel
 	int alive = 1, stepped = 0, cell, cell_proc, new_squirrel;
-	int step = -1,  inf_step, multiple;
+	int step = -1, multiple;
 	float avg_pop, avg_inf, x_buf, y_buf, inf_lev[squirrel_buffer] = { 0 }, pop_inf[squirrel_buffer];
 
 	while (alive) {
@@ -372,8 +373,8 @@ static void environmentCode(int cell) {
 		}
 	}
 	if (DEBUG) {
-		char* msg[50];
-		sprintf(msg, "Environment cell %02d has finished\n", cell);
+		char msg[50];
+		sprintf(msg, "Environment cell %02d has finished", cell);
 		debug_msg(msg);
 	}
 	if (month_end) MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw);

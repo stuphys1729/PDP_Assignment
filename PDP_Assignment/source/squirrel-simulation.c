@@ -333,6 +333,7 @@ static void environmentCode(int cell) {
 			if (shouldWorkerStop()) break;
 			if (MPI_Wtime() - start > current_month * month_time) {
 				month_end = 1;
+				MPI_Cancel(&squirrel_step);
 				break;
 			}
 			MPI_Test(&squirrel_step, &stepped, &squirrel_step_status);

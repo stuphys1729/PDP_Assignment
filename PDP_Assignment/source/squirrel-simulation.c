@@ -329,6 +329,10 @@ static void environmentCode(int cell) {
 
 		// Wait for a squirrel to step on us
 		MPI_Irecv(&incomming_inf, 1, MPI_INT, MPI_ANY_SOURCE, SQUIRREL_STEP, comw, &squirrel_step);
+		if (VERB_DEBUG) {
+			char* debug_message = "Waiting for squirrel to step on me";
+			debug_msg(debug_message);
+		}
 		while (!stepped) {
 			if (shouldWorkerStop()) break;
 			if (MPI_Wtime() - start > current_month * month_time) {

@@ -10,7 +10,7 @@
 // Pool options
 #define PP_QuitOnNoProcs 1
 #define PP_IgnoreOnNoProcs 0
-#define PP_DEBUG 0
+#define PP_DEBUG 1
 
 // Example command package data type which can be extended
 static MPI_Datatype PP_COMMAND_TYPE;
@@ -49,7 +49,8 @@ int processPoolInit() {
 		PP_processesAwaitingStart=0;
 		if (PP_DEBUG) printf("[Master] Initialised Master\n");
 		return 2;
-	} else {
+	} 
+	else {
 		MPI_Recv(&in_command, 1, PP_COMMAND_TYPE, 0, PP_CONTROL_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		return handleRecievedCommand();
 	}
@@ -79,7 +80,7 @@ void processPoolFinalise() {
 int masterPoll() {
 	if (PP_myRank == 0) {
 		MPI_Status status;
-		MPI_Recv(&in_command, 1, PP_COMMAND_TYPE, MPI_ANY_SOURCE, PP_CONTROL_TAG, MPI_COMM_WORLD, &status) ;
+		MPI_Recv(&in_command, 1, PP_COMMAND_TYPE, MPI_ANY_SOURCE, PP_CONTROL_TAG, MPI_COMM_WORLD, &status);
 
 		if(in_command.command==PP_SLEEPING) {
 			if (PP_DEBUG) printf("[Master] Received sleep command from %d\n", status.MPI_SOURCE);

@@ -16,6 +16,7 @@
 #define max_months 12
 #define month_time 0.01 // How much real time to use as a simulated month (in seconds)
 #define squirrel_buffer 50
+#define squirrel_birth 0 // Can define whether squirrels can give birth (good for debugging)
 
 // MPI Tags
 #define FUNCTION_CALL 112
@@ -283,7 +284,7 @@ static void squirrelCode(int parent)
 				debug_msg(debug_message);
 			}
 		}
-		if (multiple == 0 && step != 0 && 0) { // STOPPING BIRTH
+		if (multiple == 0 && step != 0 && squirrel_birth) {
 			avg_pop = 0;
 			for (i = 0; i < squirrel_buffer; i++) {
 				avg_pop += pop_inf[i];
@@ -386,5 +387,9 @@ static void environmentCode(int cell) {
 		debug_msg(msg);
 	}
 	if (month_end) MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw);
+	if (VERB_DEBUG) {
+		char msg[50];
+		sprintf(msg, "Environment cell %02d sent last message", cell);
+		debug_msg(msg);
 }
 	

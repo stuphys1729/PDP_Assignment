@@ -378,7 +378,12 @@ static void environmentCode(int cell) {
 			inf_this = 0;
 			current_month++;
 			month_end = 0;
-			MPI_Isend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw, &month_send);
+			MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw);// , &month_send);
+			if (VERB_DEBUG) {
+				char msg[50];
+				sprintf(msg, "Environment cell %02d sent message for month %02d", cell, current_month-1);
+				debug_msg(msg);
+			}
 		}
 	}
 	if (DEBUG) {
@@ -391,5 +396,6 @@ static void environmentCode(int cell) {
 		char msg[50];
 		sprintf(msg, "Environment cell %02d sent last message", cell);
 		debug_msg(msg);
+	}
 }
 	

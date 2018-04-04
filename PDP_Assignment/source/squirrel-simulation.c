@@ -9,12 +9,12 @@
 
 #include "squirrel-functions.h"
 
-#define init_squirrels 2
+#define init_squirrels 1
 #define init_infected 0
 #define num_env_cells 16
 #define equil_steps 20
-#define max_months 12
-#define month_time 0.01 // How much real time to use as a simulated month (in seconds)
+#define max_months 4
+#define month_time 0.1 // How much real time to use as a simulated month (in seconds)
 #define squirrel_buffer 50
 #define squirrel_birth 0 // Can define whether squirrels can give birth (good for debugging)
 
@@ -31,7 +31,7 @@
 #define COORDINATOR 1
 
 #define DEBUG 1
-#define VERB_DEBUG 0
+#define VERB_DEBUG 1
 
 static double start_time;
 static int rank;
@@ -185,7 +185,7 @@ static void coordinatorCode() {
 		else if (active_squirrels == 0) {
 			error_msg("All the squirrels died :( ");
 		}
-		if (shouldWorkerStop()) break;
+		//if (shouldWorkerStop()) break;
 	}
 	printf("Coordinator is finishing...\n");
 }
@@ -391,5 +391,6 @@ static void environmentCode(int cell) {
 		char msg[50];
 		sprintf(msg, "Environment cell %02d sent last message", cell);
 		debug_msg(msg);
+	}
 }
 	

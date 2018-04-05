@@ -208,8 +208,7 @@ static void coordinatorCode() {
 
 static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 {
-	int my_rank, i;
-	int* cells = inc_cells;
+	int my_rank, i, cells[num_env_cells];
 	float x=0, y=0, x_new, y_new, inc_pos[2];
 	MPI_Status cell_recv, pos_recv;
 
@@ -227,10 +226,13 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 			squirrelStep(x, y, &x_new, &y_new, &state);
 			x = x_new; y = y_new;
 		}
+		for (i = 0; i < num_env_cells; i++) {
+			cells[i] = inc_cells[i];
+		}
 	}
 	else { // We have been born by another squirrel
 		// Get the ranks of the environment cells
-		MPI_Recv(inc_pos, 2, MPI_FLOAT, parent, GET_POSITION, comw, &pos_recv); // TODO: Make this one message for optimisation
+		MPI_Recv(inc_pos, 2, MPI_FLOAT, parent, GET_POSITION, comw, &pos_recv);
 		MPI_Recv(&cells, num_env_cells, MPI_INT, parent, GET_CELLS, comw, &cell_recv);
 		x = inc_pos[0]; y = inc_pos[1];
 	}
@@ -249,7 +251,7 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 	int alive = 1, stepped = 0, cell, cell_proc, new_squirrel;
 	int step = -1, multiple;
 	float avg_pop, avg_inf, x_buf, y_buf, inf_lev[squirrel_buffer] = { 0 }, pop_inf[squirrel_buffer];
-	MPI_Request pos_send, cell_send, step_send, step_recv;
+	MPI_Request pos_send, cell_send = MPI_REQUEST_NULL, step_send, step_recv;
 	MPI_Status pop_recv, inf_recv;
 	float inc_levels[2];
 

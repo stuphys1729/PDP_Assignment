@@ -356,7 +356,6 @@ static void environmentCode(int cell) {
 			if (shouldWorkerStop()) break;
 			if (MPI_Wtime() - start_time > current_month * month_time) {
 				month_end = 1;
-				MPI_Cancel(&squirrel_step);
 				break;
 			}
 			MPI_Test(&squirrel_step, &stepped, &squirrel_step_status);
@@ -390,6 +389,7 @@ static void environmentCode(int cell) {
 			printf("Pop Influx: %3.f\tInf Level: %3.f\n", pop_flux, inf_lev);
 			if (current_month == max_months) {
 				MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw);
+				MPI_Cancel(&squirrel_step);
 				break;
 			} // Last message should be blocking
 			squirrels_last2 = squirrels_last1;

@@ -165,6 +165,7 @@ static void coordinatorCode() {
 
 	// Wait for all the initial processes to be ready
 	MPI_Waitall(num_env_cells + init_squirrels, sim_start, MPI_STATUSES_IGNORE);
+	start_time = MPI_Wtime(); // Reset the start time so we are mostly in sync
 
 	// Run the simulation
 	int current_month = 1, month_end = 0;
@@ -334,7 +335,7 @@ static void environmentCode(int cell) {
 	int current_month = 1, incomming_inf, stepped = 0, month_end = 0;
 	float squirrels_this = 0.0f, inf_this = 0.0f;
 	float squirrels_last1 = 0.0f, squirrels_last2 = 0.0f, inf_last = 0.0f;
-	float pop_flux, inf_lev;
+	float pop_flux = 0.0f, inf_lev = 0.0f;
 	MPI_Request month_send;
 
 	// Wait for the simulation to start
@@ -409,6 +410,10 @@ static void environmentCode(int cell) {
 		debug_msg(msg);
 	}
 	if (month_end) MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw);
+	else {
+		char* msg = "Last message not sent";
+		error_msg(msg);
+	}
 	if (VERB_DEBUG) {
 		char msg[50];
 		sprintf(msg, "Environment cell %02d sent last message", cell);

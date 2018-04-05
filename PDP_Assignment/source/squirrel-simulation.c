@@ -173,7 +173,7 @@ static void coordinatorCode() {
 		MPI_Irecv(NULL, 0, MPI_INT, workerPid, SIM_START, comw, &sim_start[i + num_env_cells]);
 		printf("Coordinator started squirrel %d on MPI process %d\n", i, workerPid);
 	}
-	active_squirrels = active_squirrels - num_env_cells - 1; // stops over counting of env cells and this coordinator
+	active_squirrels = active_squirrels - num_env_cells; // stops counting of env cells
 	infected_squirrels = infected_squirrels + init_infected;
 
 	// Wait for all the initial processes to be ready
@@ -231,7 +231,7 @@ static void coordinatorCode() {
 		if (active_squirrels > 199) {
 			error_msg("Too many Squirrels");
 		}
-		else if (active_squirrels == 0) {
+		else if (active_squirrels == 0 && current_month > 1) {
 			error_msg("All the squirrels died :( ");
 		}
 		//if (shouldWorkerStop()) break;
@@ -282,7 +282,7 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 	int alive = 1, stepped = 0, cell, cell_proc, new_squirrel;
 	int step = -1, multiple;
 	float avg_pop, avg_inf, x_buf, y_buf, inf_lev[squirrel_buffer] = { 0 }, pop_inf[squirrel_buffer];
-	MPI_Request pos_send, cell_send = MPI_REQUEST_NULL;
+	MPI_Request pos_send, cell_send = MPI_REQUEST_NULL, inf_send;
 	MPI_Status pop_recv, inf_recv;
 	
 
@@ -314,6 +314,7 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 				printf("Squirrel is stopping\n");
 				MPI_Cancel(&step_send);
 				MPI_Cancel(&step_recv);
+				MPI_Cancel(&inf_send);
 				break; // If the simulation has been ended, this worker should stop
 			}
 			MPI_Test(&step_recv, &stepped, &pop_recv);
@@ -335,9 +336,13 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 			avg_inf /= squirrel_buffer;
 
 			infected = willCatchDisease(avg_inf, &state);
-			if (infected && DEBUG) {
-				char* debug_message = "Squirrel became infected";
-				debug_msg(debug_message);
+			if (infected) { // We need to tell the coordinator
+				MPI_Isend(NULL, 0, MPI_INT, COORDINATOR, SQUIRREL_INFECTED, comw, &inf_send);
+			
+				if (DEBUG) {
+					char* debug_message = "Squirrel became infected";
+					debug_msg(debug_message);
+				}
 			}
 		}
 		if (multiple == 0 && step != 0 && squirrel_birth) {

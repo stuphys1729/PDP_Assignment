@@ -229,6 +229,9 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 		for (i = 0; i < num_env_cells; i++) {
 			cells[i] = inc_cells[i];
 		}
+		// Wait for the simulation to start
+		MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, SIM_START, comw);
+		start_time = MPI_Wtime(); // Reset the start time so we are mostly in sync
 	}
 	else { // We have been born by another squirrel
 		// Get the ranks of the environment cells
@@ -241,11 +244,6 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 		sprintf(debug_message, "Squirrel started with pos: (%1.3f,%1.3f)", x, y);
 		debug_msg(debug_message);
 	}
-	
-
-	// Wait for the simulation to start
-	MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, SIM_START, comw);
-	start_time = MPI_Wtime(); // Reset the start time so we are mostly in sync
 
 	// Simulate the squirrel
 	int alive = 1, stepped = 0, cell, cell_proc, new_squirrel;

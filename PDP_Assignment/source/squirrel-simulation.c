@@ -221,7 +221,7 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 	if (parent == COORDINATOR) {// We are an initial squirrel
 		// Could be infected
 		if (infected) inf_step = 0;
-		printf("Infected: %d", infected);
+		printf("Infected: %d\n", infected);
 		// Let the squirrel get to a position independent of the start
 		for (i = 0; i < equil_steps; i++) {
 			squirrelStep(x, y, &x_new, &y_new, &state);
@@ -250,12 +250,13 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 	int alive = 1, stepped = 0, cell, cell_proc, new_squirrel;
 	int step = -1, multiple;
 	float avg_pop, avg_inf, x_buf, y_buf, inf_lev[squirrel_buffer] = { 0 }, pop_inf[squirrel_buffer];
-	MPI_Request pos_send, cell_send = MPI_REQUEST_NULL, step_send, step_recv;
+	MPI_Request pos_send, cell_send = MPI_REQUEST_NULL;
 	MPI_Status pop_recv, inf_recv;
-	float inc_levels[2];
+	
 
 	while (alive) {
-		
+		MPI_Request step_send, step_recv;
+		float inc_levels[2];
 		// Step to new position
 		squirrelStep(x, y, &x_new, &y_new, &state);
 		x = x_new; y = y_new;
@@ -275,7 +276,7 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 		multiple = step % squirrel_buffer;
 
 		// Receive the corresponding population and infection levels
-		MPI_Irecv(inc_levels, 1, MPI_FLOAT, cell_proc, LEVELS, comw, &step_recv);
+		MPI_Irecv(inc_levels, 2, MPI_FLOAT, cell_proc, LEVELS, comw, &step_recv);
 		while (!stepped) {
 			if (shouldWorkerStop()) {
 				printf("Squirrel is stopping\n");
@@ -387,7 +388,7 @@ static void environmentCode(int cell) {
 			pop_flux = squirrels_this + squirrels_last1 + squirrels_last2;
 			inf_lev = inf_last + inf_this;
 			send_levs[0] = pop_flux; send_levs[1] = inf_lev;
-			MPI_Isend(send_levs, 1, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, LEVELS, comw, &squirrel_send);
+			MPI_Isend(send_levs, 2, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, LEVELS, comw, &squirrel_send);
 		}
 
 		// Do a test to see if the month should change

@@ -80,10 +80,10 @@ int main(int argc, char* argv[]) {
 	}
 	// Finalizes the process pool, call this before closing down MPI
 	processPoolFinalise();
-	if (DEBUG) printf("PROCESS %03d CALLED POOLFINALISE\n");
+	if (VERB_DEBUG) printf("PROCESS %03d CALLED POOLFINALISE\n");
 	// Finalize MPI, ensure you have closed the process pool first
 	MPI_Finalize();
-	if (DEBUG) printf("PROCESS %03d MADE IT TO THE END\n", rank);
+	if (VERB_DEBUG) printf("PROCESS %03d MADE IT TO THE END\n", rank);
 	return 0;
 }
 
@@ -249,12 +249,12 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 	int alive = 1, stepped = 0, cell, cell_proc, new_squirrel;
 	int step = -1, multiple;
 	float avg_pop, avg_inf, x_buf, y_buf, inf_lev[squirrel_buffer] = { 0 }, pop_inf[squirrel_buffer];
+	MPI_Request pos_send, cell_send, step_send, step_recv;
+	MPI_Status pop_recv, inf_recv;
+	float inc_levels[2];
 
 	while (alive) {
-		MPI_Request pos_send, cell_send, step_send, step_recv;
-		MPI_Status pop_recv, inf_recv;
-		float inc_levels[2];
-		// Do squirrel stuff
+		
 		// Step to new position
 		squirrelStep(x, y, &x_new, &y_new, &state);
 		x = x_new; y = y_new;
@@ -314,6 +314,7 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 			avg_pop /= squirrel_buffer;
 
 			if (willGiveBirth((float)avg_pop, &state)) { // TODO: Check if previous child has received the buffered position first
+				if (cell_send != MPI_REQUEST_NULL) MPI_Wait(&cell_send, MPI_STATUS_IGNORE);
 				new_squirrel = startWorkerProcess();
 				inc_pos[0] = x; inc_pos[1] = y;
 				MPI_Isend(inc_pos, 1, MPI_FLOAT, new_squirrel, GET_POSITION, comw, &pos_send);

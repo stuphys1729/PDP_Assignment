@@ -77,7 +77,7 @@ void processPoolFinalise() {
  * Called by the master in a loop, will wait for commands, instruct starts and returns whether to continue polling or
  * zero (false) if the program is to end
  */
-int masterPoll() {
+int masterPoll(int* change) {
 	if (PP_myRank == 0) {
 		MPI_Status status;
 		MPI_Recv(&in_command, 1, PP_COMMAND_TYPE, MPI_ANY_SOURCE, PP_CONTROL_TAG, MPI_COMM_WORLD, &status);
@@ -85,6 +85,7 @@ int masterPoll() {
 		if(in_command.command==PP_SLEEPING) {
 			if (PP_DEBUG) printf("[Master] Received sleep command from %d\n", status.MPI_SOURCE);
 			PP_active[status.MPI_SOURCE-1]=0;
+			*change = -1; // Tell the coordinator a squirrel has died
 		}
 
 		if(in_command.command==PP_RUNCOMPLETE){
@@ -94,6 +95,7 @@ int masterPoll() {
 
 		if(in_command.command==PP_STARTPROCESS) {
 			PP_processesAwaitingStart++;
+			*change = 1; // Tell the coordinator a squirrel has been born
 		}
 
 		int returnRank = startAwaitingProcessesIfNeeded(PP_processesAwaitingStart, status.MPI_SOURCE);

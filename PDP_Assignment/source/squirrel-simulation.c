@@ -27,6 +27,8 @@
 #define SIM_START 116
 #define SQUIRREL_STEP 123
 #define LEVELS 124
+#define SQUIRREL_CHANGE 125
+#define SQUIRREL_INFECTED 126
 
 #define MASTER 0
 #define COORDINATOR 1
@@ -70,10 +72,15 @@ int main(int argc, char* argv[]) {
 			sprintf(bad_setup, "Corrdinator was started on process %d", rank);
 			error_msg(bad_setup);
 		}
-
-		int masterStatus = masterPoll();
+		int change = 0;
+		int masterStatus = masterPoll(&change);
 		while (masterStatus) {
-			masterStatus = masterPoll(); // Pass something to tell if a process was killed or started?
+			MPI_Request squirrel_change;
+			if (change != 0) { // Squirrel died or was born
+				MPI_Isend(&change, 1, MPI_INT, COORDINATOR, SQUIRREL_CHANGE, comw, squirrel_change);
+				change = 0;
+			}
+			masterStatus = masterPoll(&change); // Pass something to tell if a process was killed or started?
 
 		}
 		printf("Master is finishing...\n");
@@ -173,9 +180,11 @@ static void coordinatorCode() {
 	start_time = MPI_Wtime(); // Reset the start time so we are mostly in sync
 
 	// Run the simulation
-	int current_month = 1, month_end = 0;
+	int current_month = 1, month_end = 0, change = 0, change_flag = 0, new_inf = 0, inf_flag = 0;
 	MPI_Status environment_statuses[num_env_cells];
-
+	MPI_Request squirrel_change, squirrel_infected;
+	MPI_Irecv(&change, 1, MPI_INT, MASTER, SQUIRREL_CHANGE, comw, squirrel_change);
+	MPI_Irecv(NULL, 0, MPI_INT, MPI_ANY_SOURCE, SQUIRREL_INFECTED, comw, squirrel_infected);
 	while (1) {
 		// Check if all cells have finished the current month
 		MPI_Testall(num_env_cells, environment_requests[current_month], &month_end, environment_statuses);
@@ -192,6 +201,27 @@ static void coordinatorCode() {
 				MPI_Irecv(NULL, 0, MPI_INT, env_cell_ids[i+2], MONTH_END, comw, &environment_requests[current_month][i]);
 			}
 			month_end = 0;
+		}
+		// Check if a squirrel has been born or died
+		MPI_Test(squirrel_change, &change_flag, MPI_STATUS_IGNORE);
+		if (change_flag) {
+			change_flag = 0;
+			if (change == 1) {
+				active_squirrels++;
+			}
+			if (change == -1) {
+				active_squirrels--;
+				infected_squirrels--;
+			}
+			change = 0; // Post new receive
+			MPI_Irecv(&change, 1, MPI_INT, MASTER, SQUIRREL_CHANGE, comw, squirrel_change);
+		}
+		// Check if a squirrel has become infected
+		MPI_Test(squirrel_infected, &inf_flag, MPI_STATUS_IGNORE);
+		if (inf_flag) {
+			inf_flag = 0;
+			infected_squirrels++;
+			MPI_Irecv(NULL, 0, MPI_INT, MPI_ANY_SOURCE, SQUIRREL_INFECTED, comw, squirrel_infected);
 		}
 
 		// If we have no live squirrels, or too many, then the simulation stops.

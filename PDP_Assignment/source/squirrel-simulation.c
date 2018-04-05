@@ -194,6 +194,8 @@ static void coordinatorCode() {
 			current_month++;
 			if (current_month > max_months) {
 				shutdownPool();
+				MPI_Cancel(&squirrel_change);
+				MPI_Cancel(&squirrel_infected);
 				break; // Simulation has ended
 			}
 			// Preapre messages for next month
@@ -251,7 +253,6 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 	if (parent == COORDINATOR) {// We are an initial squirrel
 		// Could be infected
 		if (infected) inf_step = 0;
-		printf("Infected: %d\n", infected);
 		// Let the squirrel get to a position independent of the start
 		for (i = 0; i < equil_steps; i++) {
 			squirrelStep(x, y, &x_new, &y_new, &state);

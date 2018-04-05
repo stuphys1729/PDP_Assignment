@@ -26,8 +26,7 @@
 #define MONTH_END 115
 #define SIM_START 116
 #define SQUIRREL_STEP 123
-#define AVG_POP 124
-#define AVG_INF 125
+#define LEVELS 124
 
 #define MASTER 0
 #define COORDINATOR 1
@@ -81,10 +80,10 @@ int main(int argc, char* argv[]) {
 	}
 	// Finalizes the process pool, call this before closing down MPI
 	processPoolFinalise();
-	printf("PROCESS %03d CALLED POOLFINALISE\n");
+	if (DEBUG) printf("PROCESS %03d CALLED POOLFINALISE\n");
 	// Finalize MPI, ensure you have closed the process pool first
 	MPI_Finalize();
-	printf("PROCESS %03d MADE IT TO THE END\n", rank);
+	if (DEBUG) printf("PROCESS %03d MADE IT TO THE END\n", rank);
 	return 0;
 }
 
@@ -100,7 +99,7 @@ static void error_msg(char * msg) {
 }
 
 static void workerCode() {
-	int workerStatus = 1, function[num_env_cells+2], env_cells[num_env_cells];
+	int workerStatus = 1, function[num_env_cells+2], env_cells[num_env_cells], i;
 	MPI_Status function_stat;
 
 	while (workerStatus) {
@@ -114,7 +113,7 @@ static void workerCode() {
 			MPI_Recv(&function, num_env_cells+2, MPI_INT, COORDINATOR, FUNCTION_CALL, comw, &function_stat);
 			if (function[0] > -1) environmentCode(function[0]); // This is a land cell
 			else {
-				for (int i = 0; i < num_env_cells; i++) {
+				for (i = 0; i < num_env_cells; i++) {
 					env_cells[i] = function[i + 2];
 				}
 				squirrelCode(COORDINATOR, function[1], env_cells); // This is one of the initial squirrels
@@ -275,7 +274,7 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 		multiple = step % squirrel_buffer;
 
 		// Receive the corresponding population and infection levels
-		MPI_Irecv(inc_levels, 1, MPI_FLOAT, cell_proc, AVG_POP, comw, &step_recv);
+		MPI_Irecv(inc_levels, 1, MPI_FLOAT, cell_proc, LEVELS, comw, &step_recv);
 		while (!stepped) {
 			if (shouldWorkerStop()) {
 				printf("Squirrel is stopping\n");
@@ -386,7 +385,7 @@ static void environmentCode(int cell) {
 			pop_flux = squirrels_this + squirrels_last1 + squirrels_last2;
 			inf_lev = inf_last + inf_this;
 			send_levs[0] = pop_flux; send_levs[1] = inf_lev;
-			MPI_Isend(send_levs, 1, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, AVG_POP, comw, squirrel_send);
+			MPI_Isend(send_levs, 1, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, LEVELS, comw, &squirrel_send);
 		}
 
 		// Do a test to see if the month should change

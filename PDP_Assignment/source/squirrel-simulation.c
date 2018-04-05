@@ -212,7 +212,7 @@ static void coordinatorCode() {
 			if (change == 1) {
 				active_squirrels++;
 			}
-			if (change == -1) {
+			if (change == -1 && current_month != max_months) { // stops counting of environemnt cells stopping
 				active_squirrels--;
 				infected_squirrels--;
 			}
@@ -232,9 +232,13 @@ static void coordinatorCode() {
 			error_msg("Too many Squirrels");
 		}
 		else if (active_squirrels == 0 && current_month > 1) {
-			error_msg("All the squirrels died :( ");
+			printf("[COORDINATOR] All the squirrels died :( ");
+			shutdownPool();
+			MPI_Cancel(&squirrel_change);
+			MPI_Cancel(&squirrel_infected);
+			break; // Simulation has ended
 		}
-		//if (shouldWorkerStop()) break;
+		if (shouldWorkerStop()) break;
 	}
 	printf("Coordinator is finishing...\n");
 }
@@ -409,7 +413,10 @@ static void environmentCode(int cell) {
 			MPI_Test(&squirrel_step, &stepped, &squirrel_step_status);
 		}
 		if (!stepped) { // We broke without being stepped on
-			if (!month_end) break; // The simulation has stopped prematurely
+			if (!month_end) {
+				MPI_Cancel(&squirrel_step);
+				break; // The simulation has stopped prematurely
+			}
 		}
 		else {
 			stepped = 0;
@@ -452,6 +459,7 @@ static void environmentCode(int cell) {
 				sprintf(msg, "Environment cell %02d sent message for month %02d", cell, current_month-1);
 				debug_msg(msg);
 			}
+			if (stepped) continue;
 			// Squirrel might have stepped on us whilst handling month end
 			MPI_Test(&squirrel_step, &stepped, &squirrel_step_status);
 			if (stepped) {

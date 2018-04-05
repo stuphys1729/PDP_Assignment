@@ -9,19 +9,21 @@
 
 #include "squirrel-functions.h"
 
-#define init_squirrels 2
+#define init_squirrels 1
 #define init_infected 0
 #define num_env_cells 16
 #define equil_steps 20
-#define max_months 12
-#define month_time 0.01 // How much real time to use as a simulated month (in seconds)
+#define max_months 4
+#define month_time 0.1 // How much real time to use as a simulated month (in seconds)
 #define squirrel_buffer 50
+#define squirrel_birth 0 // Can define whether squirrels can give birth (good for debugging)
 
 // MPI Tags
 #define FUNCTION_CALL 112
 #define GET_POSITION 113
 #define GET_CELLS 114
 #define MONTH_END 115
+#define SIM_START 116
 #define SQUIRREL_STEP 123
 #define AVG_POP 124
 #define AVG_INF 125
@@ -30,7 +32,7 @@
 #define COORDINATOR 1
 
 #define DEBUG 1
-#define VERB_DEBUG 0
+#define VERB_DEBUG 1
 
 static double start_time;
 static int rank;
@@ -128,6 +130,9 @@ static void coordinatorCode() {
 	int i, infected, active_squirrels = 0, infected_squirrels = 0, env_cell_ids[num_env_cells];
 	int f_squirrel = -1; // Defines a squirrel class, 0 or a positive integer indicates a certain land cell
 
+	// Set some requests for the start of the simulation sync-up
+	MPI_Request sim_start[num_env_cells + init_squirrels];
+
 	// Initialise the environment cells
 	MPI_Request environment_requests[max_months + 1][num_env_cells];
 	for (i = 0; i < num_env_cells; i++) {
@@ -135,25 +140,32 @@ static void coordinatorCode() {
 		env_cell_ids[i] = workerPid;
 		// Tell the processor it's an environmnt cell
 		MPI_Isend(&i, 1, MPI_INT, workerPid, FUNCTION_CALL, comw, &environment_requests[0][i]);
+		// Set a recv for the simulation start
+		MPI_Irecv(NULL, 0, MPI_INT, workerPid, SIM_START, comw, &sim_start[i]);
 		// Check when environment cells complete a month
-		MPI_Irecv(NULL, 0, MPI_INT, workerPid, MONTH_END, comw, &environment_requests[1][i]);// 1 for month 1
+		MPI_Irecv(NULL, 0, MPI_INT, workerPid, MONTH_END, comw, &environment_requests[1][i]); // First index is now month number
 		printf("Coordinator started environment cell %d on MPI process %d\n", i, workerPid);
 	}
 
 	// Initialise the squirrels
-	MPI_Request initial_squirrel_requests[2][init_squirrels];
+	MPI_Request initial_squirrel_requests[3][init_squirrels];
 	for (i = 0; i<init_squirrels; i++) {
 		int workerPid = startWorkerProcess();
 		infected = (i < init_infected);
 		// Tell the processor it's a squirrel, and if it is infected
-		MPI_Isend(&f_squirrel, 1, MPI_INT, workerPid, FUNCTION_CALL, comw, &initial_squirrel_requests[1][i]);
+		MPI_Isend(&f_squirrel, 1, MPI_INT, workerPid, FUNCTION_CALL, comw, &initial_squirrel_requests[0][i]);
 		MPI_Isend(&infected, 1, MPI_INT, workerPid, FUNCTION_CALL, comw, &initial_squirrel_requests[1][i]);
 		// And where the environment cells are
-		MPI_Isend(&env_cell_ids, num_env_cells, MPI_INT, workerPid, GET_CELLS, comw, &initial_squirrel_requests[0][i]);
+		MPI_Isend(&env_cell_ids, num_env_cells, MPI_INT, workerPid, GET_CELLS, comw, &initial_squirrel_requests[2][i]);
+		// Then a recv for the simulation start
+		MPI_Irecv(NULL, 0, MPI_INT, workerPid, SIM_START, comw, &sim_start[i + num_env_cells]);
 		active_squirrels++;
 		printf("Coordinator started squirrel %d on MPI process %d\n", i, workerPid);
 	}
 
+	// Wait for all the initial processes to be ready
+	MPI_Waitall(num_env_cells + init_squirrels, sim_start, MPI_STATUSES_IGNORE);
+	start_time = MPI_Wtime(); // Reset the start time so we are mostly in sync
 
 	// Run the simulation
 	int current_month = 1, month_end = 0;
@@ -184,7 +196,7 @@ static void coordinatorCode() {
 		else if (active_squirrels == 0) {
 			error_msg("All the squirrels died :( ");
 		}
-		if (shouldWorkerStop()) break;
+		//if (shouldWorkerStop()) break;
 	}
 	printf("Coordinator is finishing...\n");
 }
@@ -223,6 +235,10 @@ static void squirrelCode(int parent)
 	}
 	// Get the ranks of the environment cells
 	MPI_Recv(&cells, num_env_cells, MPI_INT, parent, GET_CELLS, comw, &cell_recv);
+
+	// Wait for the simulation to start
+	MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, SIM_START, comw);
+	start_time = MPI_Wtime(); // Reset the start time so we are mostly in sync
 
 	// Simulate the squirrel
 	int alive = 1, stepped = 0, cell, cell_proc, new_squirrel;
@@ -283,7 +299,7 @@ static void squirrelCode(int parent)
 				debug_msg(debug_message);
 			}
 		}
-		if (multiple == 0 && step != 0 && 0) { // STOPPING BIRTH
+		if (multiple == 0 && step != 0 && squirrel_birth) {
 			avg_pop = 0;
 			for (i = 0; i < squirrel_buffer; i++) {
 				avg_pop += pop_inf[i];
@@ -319,9 +335,12 @@ static void environmentCode(int cell) {
 	int current_month = 1, incomming_inf, stepped = 0, month_end = 0;
 	float squirrels_this = 0.0f, inf_this = 0.0f;
 	float squirrels_last1 = 0.0f, squirrels_last2 = 0.0f, inf_last = 0.0f;
-	float pop_flux, inf_lev;
-	double start = MPI_Wtime();
+	float pop_flux = 0.0f, inf_lev = 0.0f;
 	MPI_Request month_send;
+
+	// Wait for the simulation to start
+	MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, SIM_START, comw);
+	double start_time = MPI_Wtime(); // Reset the start time so we are mostly in sync
 	
 	while (current_month <= max_months) {
 		MPI_Request squirrel_step;
@@ -335,7 +354,7 @@ static void environmentCode(int cell) {
 		}
 		while (!stepped) {
 			if (shouldWorkerStop()) break;
-			if (MPI_Wtime() - start > current_month * month_time) {
+			if (MPI_Wtime() - start_time > current_month * month_time) {
 				month_end = 1;
 				MPI_Cancel(&squirrel_step);
 				break;
@@ -365,11 +384,14 @@ static void environmentCode(int cell) {
 		}
 
 		// Do a test to see if the month should change
-		if (month_end || MPI_Wtime() - start > current_month * month_time) {
+		if (month_end || MPI_Wtime() - start_time > current_month * month_time) {
 			double time = MPI_Wtime() - start_time;
 			printf("[%3.4f] | Environment Cell %02d finished month %02d | ", time, cell, current_month);
 			printf("Pop Influx: %3.f\tInf Level: %3.f\n", pop_flux, inf_lev);
-			if (current_month == max_months) break; // Last message should be blocking
+			if (current_month == max_months) {
+				MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw);
+				break;
+			} // Last message should be blocking
 			squirrels_last2 = squirrels_last1;
 			squirrels_last1 = squirrels_this;
 			squirrels_this = 0;
@@ -378,6 +400,11 @@ static void environmentCode(int cell) {
 			current_month++;
 			month_end = 0;
 			MPI_Isend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw, &month_send);
+			if (VERB_DEBUG) {
+				char msg[50];
+				sprintf(msg, "Environment cell %02d sent message for month %02d", cell, current_month-1);
+				debug_msg(msg);
+			}
 		}
 	}
 	if (DEBUG) {
@@ -385,6 +412,5 @@ static void environmentCode(int cell) {
 		sprintf(msg, "Environment cell %02d has finished", cell);
 		debug_msg(msg);
 	}
-	if (month_end) MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw);
 }
 	

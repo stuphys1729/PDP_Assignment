@@ -282,7 +282,7 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 	int alive = 1, stepped = 0, cell, cell_proc, new_squirrel;
 	int step = -1, multiple;
 	float avg_pop, avg_inf, x_buf, y_buf, inf_lev[squirrel_buffer] = { 0 }, pop_inf[squirrel_buffer];
-	MPI_Request pos_send, cell_send = MPI_REQUEST_NULL, inf_send;
+	MPI_Request pos_send, cell_send = MPI_REQUEST_NULL, inf_send = MPI_REQUEST_NULL;
 	MPI_Status pop_recv, inf_recv;
 	
 
@@ -314,7 +314,7 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 				printf("Squirrel is stopping\n");
 				MPI_Cancel(&step_send);
 				MPI_Cancel(&step_recv);
-				MPI_Cancel(&inf_send);
+				if (inf_send != MPI_REQUEST_NULL) MPI_Cancel(&inf_send);
 				break; // If the simulation has been ended, this worker should stop
 			}
 			MPI_Test(&step_recv, &stepped, &pop_recv);

@@ -388,7 +388,10 @@ static void environmentCode(int cell) {
 			double time = MPI_Wtime() - start_time;
 			printf("[%3.4f] | Environment Cell %02d finished month %02d | ", time, cell, current_month);
 			printf("Pop Influx: %3.f\tInf Level: %3.f\n", pop_flux, inf_lev);
-			if (current_month == max_months) break; // Last message should be blocking
+			if (current_month == max_months) {
+				MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw);
+				break;
+			} // Last message should be blocking
 			squirrels_last2 = squirrels_last1;
 			squirrels_last1 = squirrels_this;
 			squirrels_this = 0;
@@ -407,16 +410,6 @@ static void environmentCode(int cell) {
 	if (DEBUG) {
 		char msg[50];
 		sprintf(msg, "Environment cell %02d has finished", cell);
-		debug_msg(msg);
-	}
-	if (month_end) MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw);
-	else {
-		char* msg = "Last message not sent";
-		error_msg(msg);
-	}
-	if (VERB_DEBUG) {
-		char msg[50];
-		sprintf(msg, "Environment cell %02d sent last message", cell);
 		debug_msg(msg);
 	}
 }

@@ -336,7 +336,9 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 			avg_inf /= squirrel_buffer;
 
 			infected = willCatchDisease(avg_inf, &state);
-			if (infected) { // We need to tell the coordinator
+			if (infected) { 
+				inf_step = step; // Record that this is when we became infected
+				// We need to tell the coordinator
 				MPI_Isend(NULL, 0, MPI_INT, COORDINATOR, SQUIRREL_INFECTED, comw, &inf_send);
 			
 				if (DEBUG) {

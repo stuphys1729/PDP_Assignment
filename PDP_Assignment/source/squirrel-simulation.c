@@ -404,7 +404,6 @@ static void environmentCode(int cell) {
 			if (shouldWorkerStop()) break;
 			if (MPI_Wtime() - start_time > current_month * month_time) {
 				month_end = 1;
-				MPI_Cancel(&squirrel_step);
 				break;
 			}
 			MPI_Test(&squirrel_step, &stepped, &squirrel_step_status);
@@ -436,6 +435,7 @@ static void environmentCode(int cell) {
 			printf("[%3.4f] | Environment Cell %02d finished month %02d | ", time, cell, current_month);
 			printf("Pop Influx: %3.f\tInf Level: %3.f\n", pop_flux, inf_lev);
 			if (current_month == max_months) {
+				MPI_Cancel(&squirrel_step);
 				MPI_Ssend(NULL, 0, MPI_INT, COORDINATOR, MONTH_END, comw);
 				break;
 			} // Last message should be blocking
@@ -452,6 +452,26 @@ static void environmentCode(int cell) {
 				sprintf(msg, "Environment cell %02d sent message for month %02d", cell, current_month-1);
 				debug_msg(msg);
 			}
+			// Squirrel might have stepped on us whilst handling month end
+			MPI_Test(&squirrel_step, &stepped, &squirrel_step_status);
+			if (stepped) {
+				stepped = 0;
+
+				if (VERB_DEBUG) {
+					char debug_message[50];
+					sprintf(debug_message, "Squirrel on process %03d stepped on me", squirrel_step_status.MPI_SOURCE);
+					debug_msg(debug_message);
+				}
+
+				squirrels_this++;
+				if (incomming_inf) inf_this++;
+
+				pop_flux = squirrels_this + squirrels_last1 + squirrels_last2;
+				inf_lev = inf_last + inf_this;
+				send_levs[0] = pop_flux; send_levs[1] = inf_lev;
+				MPI_Isend(send_levs, 2, MPI_FLOAT, squirrel_step_status.MPI_SOURCE, LEVELS, comw, &squirrel_send);
+			}
+			else MPI_Cancel(&squirrel_step);
 		}
 	}
 	if (DEBUG) {

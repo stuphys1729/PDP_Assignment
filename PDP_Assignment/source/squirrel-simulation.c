@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
 	}
 	// Finalizes the process pool, call this before closing down MPI
 	processPoolFinalise();
-	if (VERB_DEBUG) printf("PROCESS %03d CALLED POOLFINALISE\n");
+	if (VERB_DEBUG) printf("PROCESS %03d CALLED POOLFINALISE\n", rank);
 	// Finalize MPI, ensure you have closed the process pool first
 	MPI_Finalize();
 	if (VERB_DEBUG) printf("PROCESS %03d MADE IT TO THE END\n", rank);
@@ -221,6 +221,7 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 	if (parent == COORDINATOR) {// We are an initial squirrel
 		// Could be infected
 		if (infected) inf_step = 0;
+		printf("Infected: %d", infected);
 		// Let the squirrel get to a position independent of the start
 		for (i = 0; i < equil_steps; i++) {
 			squirrelStep(x, y, &x_new, &y_new, &state);

@@ -171,9 +171,10 @@ static void coordinatorCode() {
 		MPI_Isend(&env_cell_ids, num_env_cells+2, MPI_INT, workerPid, FUNCTION_CALL, comw, &initial_squirrel_requests[i]);
 		// Then a recv for the simulation start
 		MPI_Irecv(NULL, 0, MPI_INT, workerPid, SIM_START, comw, &sim_start[i + num_env_cells]);
-		active_squirrels++;
 		printf("Coordinator started squirrel %d on MPI process %d\n", i, workerPid);
 	}
+	active_squirrels = active_squirrels - num_env_cells - 1; // stops over counting of env cells and this coordinator
+	infected_squirrels = infected_squirrels + init_infected;
 
 	// Wait for all the initial processes to be ready
 	MPI_Waitall(num_env_cells + init_squirrels, sim_start, MPI_STATUSES_IGNORE);

@@ -14,7 +14,7 @@
 #define num_env_cells 16
 #define equil_steps 20
 #define max_months 24
-#define month_time 0.5 // How much real time to use as a simulated month (in seconds)
+#define month_time 0.2 // How much real time to use as a simulated month (in seconds)
 #define squirrel_buffer 50
 #define squirrel_birth 1 // Can define whether squirrels can give birth (good for debugging)
 #define f_squirrel -1 // Defines a squirrel class, 0 or a positive integer indicates a certain land cell

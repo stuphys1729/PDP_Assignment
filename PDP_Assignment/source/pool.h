@@ -21,7 +21,7 @@ int processPoolInit();
 // Finalises the process pool
 void processPoolFinalise();
 // Called by the master in loop, blocks until state change, 1=continue and 0=stop
-int masterPoll();
+int masterPoll(int*);
 // Called by worker once task completed and will sleep until it receives instructions, 1=continue with new task and 0=stop
 int workerSleep();
 // Determines whether the current worker should stop or not (i.e. whether the pool is shutting down)

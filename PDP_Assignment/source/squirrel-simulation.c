@@ -243,7 +243,7 @@ static void coordinatorCode() {
 		}
 		if (shouldWorkerStop()) break;
 	}
-	printf("Coordinator is finishing...\n");
+	if (DEBUG) printf("Coordinator is finishing...\n");
 }
 
 static void squirrelCode(int parent, int inc_infected, int* inc_cells)
@@ -381,7 +381,7 @@ static void squirrelCode(int parent, int inc_infected, int* inc_cells)
 		}
 	}
 	if (!alive && DEBUG) { // Might not have stopped due to death
-		char* debug_message = "Squirrel died :( ";
+		char* debug_message = "Squirrel died :( \n";
 		debug_msg(debug_message);
 	}
 }
